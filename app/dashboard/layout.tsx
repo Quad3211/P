@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import Navigation from "@/components/shared/navigation"
@@ -17,23 +17,38 @@ export default function DashboardLayout({
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient()
+
+  const handleSignOut = useCallback(async () => {
+    const supabase = createClient()
+    if (supabase) {
+      await supabase.auth.signOut()
+    }
+    router.push("/auth/login")
+  }, [router])
 
   useEffect(() => {
     const getUser = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
-        if (!user) {
+        const supabase = createClient()
+        
+        if (!supabase) {
+          console.error("Supabase client not available")
           router.push("/auth/login")
           return
         }
 
-        setUser(user)
+        const {
+          data: { user: fetchedUser },
+        } = await supabase.auth.getUser()
 
-        const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+        if (!fetchedUser) {
+          router.push("/auth/login")
+          return
+        }
+
+        setUser(fetchedUser)
+
+        const { data } = await supabase.from("profiles").select("*").eq("id", fetchedUser.id).single()
 
         if (data) {
           setProfile(data)
@@ -43,16 +58,12 @@ export default function DashboardLayout({
       } catch (error) {
         console.error("[v0] Error fetching profile:", error)
         setLoading(false)
+        router.push("/auth/login")
       }
     }
 
     getUser()
-  }, [router, supabase])
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push("/auth/login")
-  }
+  }, [router])
 
   if (loading) {
     return (
