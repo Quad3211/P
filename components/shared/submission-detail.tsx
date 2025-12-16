@@ -1,9 +1,9 @@
+// components/shared/submission-detail.tsx
 "use client"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Download, AlertCircle, Award } from "lucide-react"
-import StatusBadge from "./status-badge"
 import ReviewModal from "./review-modal"
 import { useState, useEffect } from "react"
 import { getSubmission } from "@/lib/api"
@@ -30,6 +30,27 @@ interface SubmissionDetailProps {
   onBack: () => void
   reviewerRole?: "pc" | "amo" | "im" | "admin"
   viewOnly?: boolean
+}
+
+const getStatusBadgeColor = (status: string) => {
+  const colors: Record<string, string> = {
+    draft: "bg-slate-100 text-slate-800",
+    submitted: "bg-blue-100 text-blue-800",
+    pc_review: "bg-yellow-100 text-yellow-800",
+    amo_review: "bg-orange-100 text-orange-800",
+    approved: "bg-green-100 text-green-800",
+    rejected: "bg-red-100 text-red-800",
+    archived: "bg-purple-100 text-purple-800",
+  }
+  return colors[status] || "bg-slate-100 text-slate-800"
+}
+
+const getStatusLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    pc_review: "In PC Review",
+    amo_review: "In AMO Review",
+  }
+  return labels[status] || status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")
 }
 
 export default function SubmissionDetail({
@@ -160,10 +181,12 @@ export default function SubmissionDetail({
                   <CardDescription className="mt-2">{submission.title}</CardDescription>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <StatusBadge status={submission.status} />
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeColor(submission.status)}`}>
+                    {getStatusLabel(submission.status)}
+                  </span>
                   {canProvideSecondaryApproval && reviewType === "secondary" && (
-                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded">
-                      {userRole === "senior_instructor" ? "Senior Instructor Review" : "Secondary Review Available"}
+                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded text-center">
+                      {userRole === "senior_instructor" ? "Senior Instructor" : "Secondary Review"}
                     </span>
                   )}
                 </div>
