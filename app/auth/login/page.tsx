@@ -12,12 +12,13 @@ import Link from "next/link"
 export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [emailDomain, setEmailDomain] = useState("@heart-nta.org")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const generateEmail = (user: string) => {
-    return `${user.trim().toLowerCase()}@heart-nta.org`
+  const generateEmail = (user: string, domain: string) => {
+    return `${user.trim().toLowerCase()}${domain}`
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -33,7 +34,7 @@ export default function LoginPage() {
         return
       }
 
-      const email = generateEmail(username)
+      const email = generateEmail(username, emailDomain)
 
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -79,17 +80,29 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
-              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-                <Input
-                  type="text"
-                  placeholder="john.doe"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  className="border-none focus:ring-0 flex-1"
-                />
-                <span className="px-3 text-gray-500 font-medium">@heart-nta.org</span>
-              </div>
+              <Input
+                type="text"
+                placeholder="john.doe"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                className="mb-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email Domain</label>
+              <select
+                value={emailDomain}
+                onChange={(e) => setEmailDomain(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              >
+                <option value="@heart-nta.org">@heart-nta.org</option>
+                <option value="@heart.nta.org">@heart.nta.org (Original)</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Your email: {username ? generateEmail(username, emailDomain) : "username" + emailDomain}
+              </p>
             </div>
 
             <div>

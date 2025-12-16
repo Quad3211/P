@@ -1,6 +1,53 @@
-// app/api/users/update-role/route.ts
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
+
+export async function GET(request: NextRequest) {
+  const supabase = await createClient()
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check if user has permission to view all users
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile || !["admin", "im"].includes(profile.role)) {
+      return NextResponse.json(
+        { error: "Only IM and Admin users can view all users" },
+        { status: 403 }
+      )
+    }
+
+    // Fetch all users - fixed query
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, email, full_name, role, created_at")
+      .order("full_name", { ascending: true })
+
+    if (error) {
+      console.error("Error fetching users:", error)
+      throw error
+    }
+
+    // Return empty array if no data instead of null
+    return NextResponse.json(data || [])
+  } catch (error) {
+    console.error("Error fetching users:", error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to fetch users" },
+      { status: 500 }
+    )
+  }
+}
 
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient()
@@ -74,7 +121,7 @@ export async function PATCH(request: NextRequest) {
 
     if (error) throw error
 
-    // Create audit log entry
+    // Create audit log entry (will be handled by trigger, but we can add manual entry too)
     await supabase.from("audit_logs").insert({
       user_id: user.id,
       action: `Changed ${targetUser.full_name}'s role from ${targetUser.role} to ${role}`,
