@@ -1,11 +1,10 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { LogOut, Menu, Bell } from "lucide-react"
+import { LogOut, Menu } from "lucide-react"
 import { useState } from "react"
 import Link from "next/link"
-import { useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import NotificationsSidebar from "@/components/shared/notifications-sidebar"
 
 type UserRole = "instructor" | "pc" | "amo" | "im" | "registration" | "records" | "admin"
 
@@ -27,24 +26,6 @@ interface NavigationProps {
 
 export default function Navigation({ userName, userRole, onSignOut }: NavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [notificationCount, setNotificationCount] = useState(0)
-  const supabase = createClient()
-
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const response = await fetch("/api/notifications")
-        if (response.ok) {
-          const notifications = await response.json()
-          setNotificationCount(notifications.length)
-        }
-      } catch (error) {
-        console.error("Failed to fetch notifications:", error)
-      }
-    }
-
-    fetchNotifications()
-  }, [])
 
   return (
     <nav className="fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-50">
@@ -67,14 +48,7 @@ export default function Navigation({ userName, userRole, onSignOut }: Navigation
             <p className="text-xs text-muted-foreground">{ROLE_LABELS[userRole]}</p>
           </div>
 
-          <Button variant="ghost" size="icon" className="relative" asChild>
-            <Link href="/notifications">
-              <Bell className="w-4 h-4" />
-              {notificationCount > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              )}
-            </Link>
-          </Button>
+          <NotificationsSidebar />
 
           <Button variant="outline" size="sm" onClick={onSignOut} className="gap-2 bg-transparent">
             <LogOut className="w-4 h-4" />
