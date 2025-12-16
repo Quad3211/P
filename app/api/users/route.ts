@@ -1,32 +1,104 @@
+// app/api/users/update-role/route.ts
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function GET(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   const supabase = await createClient()
 
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser()
+    
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+    // Check if user is IM or admin
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
 
-    if (profile?.role !== "admin" && profile?.role !== "records") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    if (!profile || !["admin", "im"].includes(profile.role)) {
+      return NextResponse.json(
+        { error: "Only IM and Admin users can change roles" },
+        { status: 403 }
+      )
     }
 
-    const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false })
+    const body = await request.json()
+    const { userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json(
+        { error: "Missing userId or role" },
+        { status: 400 }
+      )
+    }
+
+    // Validate role
+    const validRoles = [
+      "instructor",
+      "senior_instructor",
+      "pc",
+      "amo",
+      "im",
+      "registration",
+      "records",
+      "admin",
+    ]
+
+    if (!validRoles.includes(role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 })
+    }
+
+    // Get target user info before update
+    const { data: targetUser } = await supabase
+      .from("profiles")
+      .select("full_name, email, role")
+      .eq("id", userId)
+      .single()
+
+    if (!targetUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    // Update the user's role
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ role })
+      .eq("id", userId)
+      .select()
 
     if (error) throw error
 
-    return NextResponse.json(data)
+    // Create audit log entry
+    await supabase.from("audit_logs").insert({
+      user_id: user.id,
+      action: `Changed ${targetUser.full_name}'s role from ${targetUser.role} to ${role}`,
+      action_type: "role_change",
+      details: {
+        target_user_id: userId,
+        target_user_name: targetUser.full_name,
+        target_user_email: targetUser.email,
+        old_role: targetUser.role,
+        new_role: role,
+        changed_by_id: user.id,
+      },
+    })
+
+    return NextResponse.json({
+      success: true,
+      user: data[0],
+      message: `Successfully updated ${targetUser.full_name} to ${role}`,
+    })
   } catch (error) {
+    console.error("Role update error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch users" },
-      { status: 500 },
+      { error: error instanceof Error ? error.message : "Failed to update role" },
+      { status: 500 }
     )
   }
 }

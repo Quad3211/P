@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Download, AlertCircle } from "lucide-react"
+import { ArrowLeft, Download, AlertCircle, Award } from "lucide-react"
 import StatusBadge from "./status-badge"
 import ReviewModal from "./review-modal"
 import { useState, useEffect } from "react"
@@ -76,14 +76,37 @@ export default function SubmissionDetail({
   }, [submission.id, submission.title])
 
   // Determine if user can review
-  const isSecondaryApprover = ["im", "admin"].includes(userRole)
+  const isSecondaryApprover = ["im", "admin", "senior_instructor"].includes(userRole)
   const isPrimaryReviewer = reviewerRole && userRole === reviewerRole
   const canReview = (isPrimaryReviewer || isSecondaryApprover) && !viewOnly
 
-  // Determine if secondary review is appropriate
-  const needsSecondaryReview = 
-    isSecondaryApprover && 
-    (submission.status === "submitted" || submission.status === "amo_review")
+  // Determine review type and stage
+  let reviewType = "primary"
+  let reviewStage = ""
+  let canProvideSecondaryApproval = false
+
+  if (isSecondaryApprover && !isPrimaryReviewer) {
+    reviewType = "secondary"
+    
+    // Senior instructors can only approve PC stage
+    if (userRole === "senior_instructor" && submission.status === "submitted") {
+      canProvideSecondaryApproval = true
+      reviewStage = "pc"
+    }
+    // IM and Admin can approve both stages
+    else if (["im", "admin"].includes(userRole)) {
+      if (submission.status === "submitted") {
+        canProvideSecondaryApproval = true
+        reviewStage = "pc"
+      } else if (submission.status === "amo_review") {
+        canProvideSecondaryApproval = true
+        reviewStage = "amo"
+      }
+    }
+  } else if (isPrimaryReviewer) {
+    reviewStage = reviewerRole || ""
+    canProvideSecondaryApproval = true
+  }
 
   const latestDoc = submission.submission_documents?.[0]
 
@@ -94,15 +117,31 @@ export default function SubmissionDetail({
         Back
       </Button>
 
-      {/* Secondary Approver Alert */}
-      {needsSecondaryReview && !viewOnly && (
+      {/* Senior Instructor Secondary Approval Alert */}
+      {userRole === "senior_instructor" && submission.status === "submitted" && !viewOnly && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex gap-3">
+            <Award className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-purple-900">Senior Instructor Authority</p>
+              <p className="text-sm text-purple-800 mt-1">
+                As a Senior Instructor, you are authorized to provide secondary approval for this PC review.
+                Your decision will be recorded in the audit trail as a secondary review.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IM/Admin Secondary Approval Alert */}
+      {["im", "admin"].includes(userRole) && canProvideSecondaryApproval && !isPrimaryReviewer && !viewOnly && (
         <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4">
           <div className="flex gap-3">
             <AlertCircle className="w-5 h-5 text-cyan-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-cyan-900">Secondary Approval Authority</p>
               <p className="text-sm text-cyan-800 mt-1">
-                You are authorized to approve or reject this submission as a secondary approver ({userRole.toUpperCase()}).
+                You are authorized to approve or reject this submission as a secondary approver ({userRole.toUpperCase()}) for the {reviewStage.toUpperCase()} stage.
                 Your decision will be recorded in the audit trail as a secondary review.
               </p>
             </div>
@@ -122,9 +161,9 @@ export default function SubmissionDetail({
                 </div>
                 <div className="flex flex-col gap-2">
                   <StatusBadge status={submission.status} />
-                  {needsSecondaryReview && (
-                    <span className="px-2 py-1 bg-cyan-100 text-cyan-800 text-xs font-semibold rounded">
-                      Secondary Review Available
+                  {canProvideSecondaryApproval && reviewType === "secondary" && (
+                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded">
+                      {userRole === "senior_instructor" ? "Senior Instructor Review" : "Secondary Review Available"}
                     </span>
                   )}
                 </div>
@@ -189,29 +228,34 @@ export default function SubmissionDetail({
 
         {/* Sidebar */}
         <div className="space-y-4">
-          {canReview && (
-            <Card className="border-2 border-cyan-200">
+          {canReview && canProvideSecondaryApproval && (
+            <Card className={`border-2 ${reviewType === "secondary" && userRole === "senior_instructor" ? "border-purple-200" : "border-cyan-200"}`}>
               <CardHeader>
-                <CardTitle className="text-lg">Review Actions</CardTitle>
-                {needsSecondaryReview && (
-                  <CardDescription className="text-cyan-600 font-medium">
-                    Secondary Approver
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {reviewType === "secondary" && userRole === "senior_instructor" && (
+                    <Award className="w-4 h-4 text-purple-600" />
+                  )}
+                  Review Actions
+                </CardTitle>
+                {reviewType === "secondary" && (
+                  <CardDescription className={userRole === "senior_instructor" ? "text-purple-600 font-medium" : "text-cyan-600 font-medium"}>
+                    {userRole === "senior_instructor" ? "Senior Instructor" : "Secondary Approver"} ({reviewStage.toUpperCase()})
                   </CardDescription>
                 )}
               </CardHeader>
               <CardContent>
                 <Button 
                   onClick={() => setShowReviewModal(true)} 
-                  className="w-full bg-cyan-500 hover:bg-cyan-600" 
+                  className={`w-full ${userRole === "senior_instructor" ? "bg-purple-500 hover:bg-purple-600" : "bg-cyan-500 hover:bg-cyan-600"}`}
                   disabled={loading}
                 >
-                  {needsSecondaryReview 
+                  {reviewType === "secondary" 
                     ? "Secondary Review & Decide" 
-                    : reviewerRole === "pc" 
+                    : reviewStage === "pc" 
                       ? "Review & Decide" 
                       : "Final Decision"}
                 </Button>
-                {needsSecondaryReview && (
+                {reviewType === "secondary" && (
                   <p className="text-xs text-slate-500 mt-2 text-center">
                     Your review will be logged as secondary approval
                   </p>
@@ -237,7 +281,7 @@ export default function SubmissionDetail({
       {showReviewModal && (
         <ReviewModal
           submission={submission}
-          stage={needsSecondaryReview ? "secondary" : (reviewerRole === "pc" ? "pc" : "amo")}
+          stage={reviewStage === "pc" ? "pc" : "amo"}
           onClose={() => setShowReviewModal(false)}
           onSubmit={async (decision, comments) => {
             setLoading(true)
@@ -247,7 +291,7 @@ export default function SubmissionDetail({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   submission_id: submission.id,
-                  reviewer_role: reviewerRole || userRole,
+                  reviewer_role: reviewStage,
                   status: decision,
                   comments,
                 }),

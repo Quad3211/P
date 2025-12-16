@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, FileText, Archive, Settings, LogOut } from "lucide-react"
+import { LayoutDashboard, FileText, Archive, Settings, LogOut, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 
@@ -21,10 +21,11 @@ export default function Sidebar({ userRole }: SidebarProps) {
   }
 
   const navItems = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/submissions", label: "Submissions", icon: FileText },
-    { href: "/dashboard/archive", label: "Archive", icon: Archive },
-    { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["all"] },
+    { href: "/dashboard/submissions", label: "Submissions", icon: FileText, roles: ["all"] },
+    { href: "/dashboard/archive", label: "Archive", icon: Archive, roles: ["records", "admin"] },
+    { href: "/dashboard/users", label: "User Management", icon: Users, roles: ["im", "admin"] },
+    { href: "/dashboard/settings", label: "Settings", icon: Settings, roles: ["admin", "records", "im"] },
   ]
 
   const isActive = (href: string) => {
@@ -34,10 +35,17 @@ export default function Sidebar({ userRole }: SidebarProps) {
     return pathname.startsWith(href)
   }
 
+  const canAccess = (roles: string[]) => {
+    if (roles.includes("all")) return true
+    return roles.includes(userRole)
+  }
+
   return (
     <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 border-r border-border bg-card overflow-y-auto">
       <nav className="p-4 space-y-2">
         {navItems.map((item) => {
+          if (!canAccess(item.roles)) return null
+          
           const Icon = item.icon
           return (
             <Link
