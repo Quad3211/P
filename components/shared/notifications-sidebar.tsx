@@ -1,119 +1,128 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Bell, X, CheckCircle, Clock, AlertCircle, FileText, Archive, ExternalLink } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { createClient } from "@/lib/supabase/client"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Bell,
+  X,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  FileText,
+  Archive,
+  ExternalLink,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 
 interface Notification {
-  id: string
-  type: "submission" | "review" | "role_change" | "archive"
-  title: string
-  message: string
-  timestamp: string
-  read: boolean
-  submission_id?: string
+  id: string;
+  type: "submission" | "review" | "role_change" | "archive";
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  submission_id?: string;
 }
 
 export default function NotificationsSidebar() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
+  const [isOpen, setIsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    fetchNotifications()
-  }, [])
+    fetchNotifications();
+  }, []);
 
   useEffect(() => {
-    const count = notifications.filter(n => !n.read).length
-    setUnreadCount(count)
-  }, [notifications])
+    const count = notifications.filter((n) => !n.read).length;
+    setUnreadCount(count);
+  }, [notifications]);
 
   const fetchNotifications = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await fetch("/api/notifications")
+      const response = await fetch("/api/notifications");
       if (response.ok) {
-        const data = await response.json()
-        setNotifications(data)
+        const data = await response.json();
+        setNotifications(data);
       }
     } catch (error) {
-      console.error("Failed to fetch notifications:", error)
+      console.error("Failed to fetch notifications:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const markAsRead = (id: string) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ))
-  }
+    setNotifications(
+      notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
 
   const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })))
-  }
+    setNotifications(notifications.map((n) => ({ ...n, read: true })));
+  };
 
   const handleNotificationClick = async (notification: Notification) => {
     // Mark as read
-    markAsRead(notification.id)
-    
+    markAsRead(notification.id);
+
     // Close sidebar
-    setIsOpen(false)
-    
+    setIsOpen(false);
+
     // Navigate to submission if available
     if (notification.submission_id) {
       // First, we need to get the actual submission ID from the API
       try {
-        const response = await fetch("/api/submissions")
+        const response = await fetch("/api/submissions");
         if (response.ok) {
-          const submissions = await response.json()
-          const submission = submissions.find((s: any) => 
-            s.submission_id === notification.submission_id
-          )
-          
+          const submissions = await response.json();
+          const submission = submissions.find(
+            (s: any) => s.submission_id === notification.submission_id
+          );
+
           if (submission) {
-            router.push(`/dashboard/submissions/${submission.id}`)
+            router.push(`/dashboard/submissions/${submission.id}`);
           }
         }
       } catch (error) {
-        console.error("Failed to navigate to submission:", error)
+        console.error("Failed to navigate to submission:", error);
       }
     }
-  }
+  };
 
   const getIcon = (type: string) => {
     switch (type) {
       case "submission":
-        return <FileText className="w-4 h-4" />
+        return <FileText className="w-4 h-4" />;
       case "review":
-        return <Clock className="w-4 h-4" />
+        return <Clock className="w-4 h-4" />;
       case "role_change":
-        return <AlertCircle className="w-4 h-4" />
+        return <AlertCircle className="w-4 h-4" />;
       case "archive":
-        return <Archive className="w-4 h-4" />
+        return <Archive className="w-4 h-4" />;
       default:
-        return <Bell className="w-4 h-4" />
+        return <Bell className="w-4 h-4" />;
     }
-  }
+  };
 
   const getTimeAgo = (timestamp: string) => {
-    const now = new Date()
-    const time = new Date(timestamp)
-    const diffMs = now.getTime() - time.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffMs = now.getTime() - time.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return "Just now"
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays < 7) return `${diffDays}d ago`
-    return time.toLocaleDateString()
-  }
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return time.toLocaleDateString();
+  };
 
   return (
     <>
@@ -147,7 +156,9 @@ export default function NotificationsSidebar() {
           <div className="flex items-center gap-3">
             <Bell className="w-5 h-5 text-cyan-600" />
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Notifications</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                Notifications
+              </h2>
               <p className="text-xs text-slate-500">{unreadCount} unread</p>
             </div>
           </div>
@@ -202,14 +213,22 @@ export default function NotificationsSidebar() {
                   <div className="flex gap-3">
                     <div
                       className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                        !notification.read ? "bg-cyan-100 text-cyan-600" : "bg-slate-100 text-slate-600"
+                        !notification.read
+                          ? "bg-cyan-100 text-cyan-600"
+                          : "bg-slate-100 text-slate-600"
                       }`}
                     >
                       {getIcon(notification.type)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <h4 className={`text-sm font-semibold ${!notification.read ? "text-slate-900" : "text-slate-700"}`}>
+                        <h4
+                          className={`text-sm font-semibold ${
+                            !notification.read
+                              ? "text-slate-900"
+                              : "text-slate-700"
+                          }`}
+                        >
                           {notification.title}
                         </h4>
                         <span className="text-xs text-slate-500 whitespace-nowrap">
@@ -239,5 +258,5 @@ export default function NotificationsSidebar() {
         </div>
       </div>
     </>
-  )
+  );
 }
