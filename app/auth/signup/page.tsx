@@ -1,3 +1,4 @@
+// app/auth/signup/page.tsx
 "use client"
 
 import type React from "react"
@@ -8,18 +9,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle, CheckCircle2 } from "lucide-react"
 
-type UserRole = "instructor" | "pc" | "amo" | "im" | "registration" | "records" | "admin"
 type Institution = "Boys Town" | "Stony Hill" | "Leap"
 
 export default function SignupPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
-  const [role, setRole] = useState<UserRole>("instructor")
   const [institution, setInstitution] = useState<Institution>("Boys Town")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -42,8 +44,8 @@ export default function SignupPage() {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             full_name: fullName,
-            role: role,
             institution: institution,
+            // Role is always instructor for new signups
           },
         },
       })
@@ -51,13 +53,52 @@ export default function SignupPage() {
       if (signUpError) {
         setError(signUpError.message)
       } else {
-        router.push("/auth/signup-success")
+        setSuccess(true)
       }
     } catch (err) {
       setError("An unexpected error occurred")
     } finally {
       setLoading(false)
     }
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-10 h-10 text-green-600" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Registration Submitted!</h2>
+          <div className="space-y-4 text-left mb-6">
+            <p className="text-gray-600">
+              Your account has been created and is now pending approval from the <strong>Head of Programs</strong>.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-900">
+                <strong>What happens next?</strong>
+              </p>
+              <ul className="text-sm text-blue-800 mt-2 space-y-1 list-disc list-inside">
+                <li>The Head of Programs will review your registration</li>
+                <li>You'll receive an email once your account is approved</li>
+                <li>After approval, you can sign in and start submitting</li>
+              </ul>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-sm text-amber-900">
+                <strong>Important:</strong> You cannot sign in until your account is approved.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/auth/login"
+            className="inline-block px-6 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-medium"
+          >
+            Back to Sign In
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -70,8 +111,18 @@ export default function SignupPage() {
           <h2 className="text-2xl font-bold text-gray-900">Submission</h2>
         </div>
 
-        <h3 className="text-3xl font-bold text-gray-900 mb-2">Create your account</h3>
-        <p className="text-gray-600 mb-8">Join the RFA Submission Portal to streamline your workflow.</p>
+        <h3 className="text-3xl font-bold text-gray-900 mb-2">Instructor Registration</h3>
+        <p className="text-gray-600 mb-6">
+          Create your instructor account. Your registration will be reviewed by the Head of Programs.
+        </p>
+
+        {/* Info Alert */}
+        <Alert className="mb-6 bg-blue-50 border-blue-200">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-900">
+            All new accounts are created as <strong>Instructor</strong> and require approval before you can sign in.
+          </AlertDescription>
+        </Alert>
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div>
@@ -86,7 +137,9 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <Label className="block text-sm font-medium text-gray-700 mb-2">Institution <span className="text-red-500">*</span></Label>
+            <Label className="block text-sm font-medium text-gray-700 mb-2">
+              Institution <span className="text-red-500">*</span>
+            </Label>
             <select
               value={institution}
               onChange={(e) => setInstitution(e.target.value as Institution)}
@@ -98,7 +151,7 @@ export default function SignupPage() {
               <option value="Leap">Leap</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              You can only access data from your selected institution
+              You will only be able to access data from your selected institution
             </p>
           </div>
 
@@ -125,32 +178,21 @@ export default function SignupPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
             />
+            <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
           </div>
 
-          <div>
-            <Label className="block text-sm font-medium text-gray-700 mb-2">Role</Label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value="instructor">Instructor</option>
-              <option value="pc">PC Reviewer</option>
-              <option value="amo">AMO Reviewer</option>
-              <option value="im">IM</option>
-              <option value="registration">Registration</option>
-              <option value="records">Records Manager</option>
-              <option value="admin">Administrator</option>
-            </select>
-          </div>
+          {error && (
+            <Alert className="bg-red-50 border-red-200">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-700">{error}</AlertDescription>
+            </Alert>
+          )}
 
-          {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-900">
-              <strong>Important:</strong> You can only view and manage submissions from <strong>{institution}</strong>. 
-              This cannot be changed after account creation.
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <p className="text-sm text-amber-900">
+              <strong>Important:</strong> After registration, you must wait for approval from the <strong>Head of Programs</strong> before you can sign in.
             </p>
           </div>
 
@@ -159,7 +201,7 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full bg-cyan-500 hover:bg-cyan-600 text-white py-2 rounded-lg font-medium"
           >
-            {loading ? "Creating account..." : "Sign Up"}
+            {loading ? "Creating account..." : "Create Instructor Account"}
           </Button>
         </form>
 
