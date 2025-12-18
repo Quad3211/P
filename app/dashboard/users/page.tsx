@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Users, Search, Shield, Award, RefreshCw } from "lucide-react"
+import { Users, Search, Shield, Award, RefreshCw, Building2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ interface User {
   email: string
   full_name: string
   role: string
+  institution: string
   created_at: string
 }
 
@@ -49,7 +50,7 @@ const ROLE_INFO: Record<UserRole, { label: string; description: string; color: s
   },
   im: {
     label: "IM",
-    description: "Secondary approval for PC and AMO",
+    description: "Institution Manager - manages users",
     color: "bg-cyan-100 text-cyan-800"
   },
   registration: {
@@ -69,6 +70,12 @@ const ROLE_INFO: Record<UserRole, { label: string; description: string; color: s
   }
 }
 
+const INSTITUTION_COLORS: Record<string, string> = {
+  "Boys Town": "bg-blue-100 text-blue-800",
+  "Stony Hill": "bg-green-100 text-green-800",
+  "Leap": "bg-purple-100 text-purple-800"
+}
+
 export default function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
@@ -78,6 +85,7 @@ export default function UserManagementPage() {
   const [newRole, setNewRole] = useState<UserRole>("instructor")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [currentUserInstitution, setCurrentUserInstitution] = useState<string>("")
 
   useEffect(() => {
     fetchUsers()
@@ -105,6 +113,10 @@ export default function UserManagementPage() {
         const data = await response.json()
         setUsers(data)
         setFilteredUsers(data)
+        // Get current user's institution from the first user in the list
+        if (data.length > 0) {
+          setCurrentUserInstitution(data[0].institution)
+        }
       }
     } catch (error) {
       console.error("Failed to fetch users:", error)
@@ -124,7 +136,7 @@ export default function UserManagementPage() {
 
     setUpdating(true)
     try {
-      const response = await fetch("/api/users/update-role", {
+      const response = await fetch("/api/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -168,8 +180,32 @@ export default function UserManagementPage() {
             <Users className="w-8 h-8 text-cyan-600" />
             <h1 className="text-4xl font-bold text-slate-900">User Management</h1>
           </div>
-          <p className="text-slate-600">Manage user roles and permissions</p>
+          <p className="text-slate-600">Manage user roles and permissions for your institution</p>
+          {currentUserInstitution && (
+            <div className="flex items-center gap-2 mt-2">
+              <Building2 className="w-4 h-4 text-slate-500" />
+              <span className="text-sm text-slate-600">
+                Managing users from: <Badge className={INSTITUTION_COLORS[currentUserInstitution]}>{currentUserInstitution}</Badge>
+              </span>
+            </div>
+          )}
         </div>
+
+        {/* Institution Notice */}
+        <Card className="mb-6 bg-blue-50 border-blue-200">
+          <CardContent className="pt-6">
+            <div className="flex gap-3">
+              <Building2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-blue-900 mb-2">Institution-Based Access</h4>
+                <p className="text-sm text-blue-800">
+                  You can only view and manage users from <strong>{currentUserInstitution}</strong>. Users can only access 
+                  submissions and data from their assigned institution.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Role Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
@@ -185,34 +221,18 @@ export default function UserManagementPage() {
           ))}
         </div>
 
-        {/* Secondary Approver Info */}
-        <Card className="mb-6 bg-cyan-50 border-cyan-200">
-          <CardContent className="pt-6">
-            <div className="flex gap-3">
-              <Shield className="w-5 h-5 text-cyan-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-semibold text-cyan-900 mb-2">Secondary Approval Authority</h4>
-                <div className="space-y-1 text-sm text-cyan-800">
-                  <p><strong>Senior Instructors:</strong> Can provide secondary approval for PC reviews when PC is unavailable</p>
-                  <p><strong>IM & Admin:</strong> Can provide secondary approval for both PC and AMO reviews</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Search and Filter */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>All Users</span>
+              <span>Institution Users</span>
               <Button variant="outline" size="sm" onClick={fetchUsers} disabled={loading}>
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
             </CardTitle>
             <CardDescription>
-              {filteredUsers.length} user{filteredUsers.length !== 1 ? "s" : ""} found
+              {filteredUsers.length} user{filteredUsers.length !== 1 ? "s" : ""} from {currentUserInstitution}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -243,6 +263,7 @@ export default function UserManagementPage() {
                     <tr className="border-b">
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Name</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Email</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Institution</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Role</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Secondary Approval</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700">Action</th>
@@ -258,6 +279,11 @@ export default function UserManagementPage() {
                         <tr key={user.id} className="border-b hover:bg-slate-50">
                           <td className="px-4 py-3 font-medium text-slate-900">{user.full_name}</td>
                           <td className="px-4 py-3 text-slate-600">{user.email}</td>
+                          <td className="px-4 py-3">
+                            <Badge className={INSTITUTION_COLORS[user.institution] || "bg-gray-100 text-gray-800"}>
+                              {user.institution}
+                            </Badge>
+                          </td>
                           <td className="px-4 py-3">
                             <Badge className={roleInfo?.color || "bg-gray-100 text-gray-800"}>
                               {roleInfo?.label || user.role}
@@ -313,6 +339,13 @@ export default function UserManagementPage() {
             </DialogHeader>
 
             <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center gap-2 text-sm text-blue-800">
+                  <Building2 className="w-4 h-4" />
+                  <span>Institution: <strong>{selectedUser?.institution}</strong></span>
+                </div>
+              </div>
+
               <div>
                 <Label htmlFor="role">Select New Role</Label>
                 <select
@@ -347,7 +380,7 @@ export default function UserManagementPage() {
                     <Shield className="w-5 h-5 text-cyan-600 flex-shrink-0" />
                     <div className="text-sm text-cyan-800">
                       <p className="font-semibold mb-1">Full Secondary Approval Authority</p>
-                      <p>This user will be able to provide secondary approval for both PC and AMO reviews.</p>
+                      <p>This user will be able to provide secondary approval for both PC and AMO reviews, and manage users from {selectedUser?.institution}.</p>
                     </div>
                   </div>
                 </div>

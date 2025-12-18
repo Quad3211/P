@@ -1,21 +1,23 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
+import { Label } from "@/components/ui/label"
 
 type UserRole = "instructor" | "pc" | "amo" | "im" | "registration" | "records" | "admin"
+type Institution = "Boys Town" | "Stony Hill" | "Leap"
 
 export default function SignupPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
   const [role, setRole] = useState<UserRole>("instructor")
+  const [institution, setInstitution] = useState<Institution>("Boys Town")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -41,6 +43,7 @@ export default function SignupPage() {
           data: {
             full_name: fullName,
             role: role,
+            institution: institution,
           },
         },
       })
@@ -72,7 +75,7 @@ export default function SignupPage() {
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+            <Label className="block text-sm font-medium text-gray-700 mb-2">Full Name</Label>
             <Input
               type="text"
               placeholder="John Doe"
@@ -83,7 +86,24 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+            <Label className="block text-sm font-medium text-gray-700 mb-2">Institution <span className="text-red-500">*</span></Label>
+            <select
+              value={institution}
+              onChange={(e) => setInstitution(e.target.value as Institution)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              required
+            >
+              <option value="Boys Town">Boys Town</option>
+              <option value="Stony Hill">Stony Hill</option>
+              <option value="Leap">Leap</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              You can only access data from your selected institution
+            </p>
+          </div>
+
+          <div>
+            <Label className="block text-sm font-medium text-gray-700 mb-2">Username</Label>
             <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
               <Input
                 type="text"
@@ -98,7 +118,7 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <Label className="block text-sm font-medium text-gray-700 mb-2">Password</Label>
             <Input
               type="password"
               placeholder="••••••••"
@@ -109,7 +129,7 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+            <Label className="block text-sm font-medium text-gray-700 mb-2">Role</Label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
@@ -126,6 +146,13 @@ export default function SignupPage() {
           </div>
 
           {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-900">
+              <strong>Important:</strong> You can only view and manage submissions from <strong>{institution}</strong>. 
+              This cannot be changed after account creation.
+            </p>
+          </div>
 
           <Button
             type="submit"

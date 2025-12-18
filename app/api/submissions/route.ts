@@ -13,10 +13,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get user role
+    // Get user profile with institution
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, institution")
       .eq("id", user.id)
       .single()
 
@@ -25,17 +25,24 @@ export async function GET(request: NextRequest) {
     }
 
     const role = profile.role
+    const institution = profile.institution
 
-    let query = supabase.from("submissions").select("*").order("updated_at", { ascending: false })
+    // Base query - always filter by institution
+    let query = supabase
+      .from("submissions")
+      .select("*")
+      .eq("institution", institution)
+      .order("updated_at", { ascending: false })
 
-    // Role-based filtering
+    // Additional role-based filtering
     if (role === "instructor") {
       // Instructors only see their own submissions
       query = query.eq("instructor_id", user.id)
-    } else if (role !== "pc" && role !== "amo" && role !== "admin") {
-      // Non-reviewer, non-instructor: only see AMO-approved or later
+    } else if (role !== "pc" && role !== "amo" && role !== "admin" && role !== "im" && role !== "records" && role !== "senior_instructor") {
+      // Other roles only see AMO-approved or later
       query = query.in("status", ["amo_approved", "final_archived"])
     }
+    // PC, AMO, IM, Records, Senior Instructor, and Admin see all submissions from their institution
 
     const { data, error } = await query
 
@@ -50,8 +57,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-
-
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
 
@@ -64,10 +69,21 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { skill_area, skill_code, cohort, test_date, description } = body
+    const { skill_area, skill_code, cohort, test_date, description, cluster } = body
 
-    // Get profile info
-    const { data: profile } = await supabase.from("profiles").select("email, full_name").eq("id", user.id).single()
+    // Get profile info including institution
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email, full_name, institution")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.institution) {
+      return NextResponse.json(
+        { error: "User institution not found. Please contact administrator." },
+        { status: 400 }
+      )
+    }
 
     // Generate submission ID
     const now = new Date()
@@ -77,13 +93,16 @@ export async function POST(request: NextRequest) {
       .from("submissions")
       .insert({
         submission_id: submissionId,
+        title: `${skill_area} - ${cohort}`,
         skill_area,
         skill_code,
+        cluster,
         cohort,
         test_date,
         instructor_id: user.id,
-        instructor_email: profile?.email,
-        instructor_name: profile?.full_name,
+        instructor_email: profile.email,
+        instructor_name: profile.full_name,
+        institution: profile.institution,
         description,
         status: "draft",
       })
@@ -93,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data[0], { status: 201 })
   } catch (error: any) {
-    console.error(error.message);
+    console.error(error.message)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create submission" },
       { status: 500 },
