@@ -6,7 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import NotificationsSidebar from "@/components/shared/notifications-sidebar"
 
-type UserRole = "instructor" | "pc" | "amo" | "im" | "registration" | "records" | "admin"
+type UserRole = "instructor" | "pc" | "amo" | "im" | "registration" | "records" | "admin" | "senior_instructor"
 
 const ROLE_LABELS: Record<UserRole, string> = {
   instructor: "Instructor",
@@ -16,6 +16,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   registration: "Registration",
   records: "Records Manager",
   admin: "Administrator",
+  senior_instructor: "Senior Instructor",
 }
 
 interface NavigationProps {
@@ -35,7 +36,7 @@ export default function Navigation({ userName, userRole, onSignOut }: Navigation
             <div className="w-8 h-8 bg-cyan-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">✓</span>
             </div>
-            <h1 className="font-semibold text-foreground hidden md:block">SchoolFlow</h1>
+            <h1 className="font-semibold text-foreground hidden md:block">Submission</h1>
           </Link>
           <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden">
             <Menu className="w-5 h-5" />

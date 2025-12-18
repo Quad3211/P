@@ -2,9 +2,9 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, FileText, Archive, Settings, LogOut, Users } from "lucide-react"
+import { LayoutDashboard, FileText, Archive, Settings, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
 
 interface SidebarProps {
   userRole: string
@@ -13,11 +13,23 @@ interface SidebarProps {
 export default function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push("/auth/login")
+    try {
+      const supabase = createClient()
+      if (supabase) {
+        await supabase.auth.signOut()
+      }
+      router.push("/auth/login")
+    } catch (error) {
+      console.error("Logout error:", error)
+      router.push("/auth/login")
+    }
   }
 
   const navItems = [
@@ -40,8 +52,12 @@ export default function Sidebar({ userRole }: SidebarProps) {
     return roles.includes(userRole)
   }
 
+  if (!isClient) {
+    return null
+  }
+
   return (
-    <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 border-r border-border bg-card overflow-y-auto">
+    <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 border-r border-border bg-card overflow-y-auto z-40">
       <nav className="p-4 space-y-2">
         {navItems.map((item) => {
           if (!canAccess(item.roles)) return null
@@ -52,7 +68,9 @@ export default function Sidebar({ userRole }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                isActive(item.href) ? "bg-cyan-500 text-white" : "text-foreground hover:bg-muted"
+                isActive(item.href) 
+                  ? "bg-cyan-500 text-white" 
+                  : "text-foreground hover:bg-muted"
               }`}
             >
               <Icon className="w-5 h-5" />
@@ -61,13 +79,6 @@ export default function Sidebar({ userRole }: SidebarProps) {
           )
         })}
       </nav>
-
-      <div className="absolute bottom-4 left-4 right-4">
-        <Button onClick={handleLogout} variant="outline" className="w-full gap-2 bg-transparent">
-          <LogOut className="w-4 h-4" />
-          Sign Out
-        </Button>
-      </div>
     </aside>
   )
 }

@@ -5,11 +5,11 @@ import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
-
+// init
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'Submission Portal',
+  description: 'A portal for managing RFA submissions and reviews.',
+  generator: 'TeroBytez & others',
   icons: {
     icon: [
       {

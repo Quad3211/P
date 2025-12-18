@@ -1,4 +1,3 @@
-// components/shared/submission-detail.tsx
 "use client"
 
 import { Button } from "@/components/ui/button"
@@ -6,8 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft, Download, AlertCircle, Award } from "lucide-react"
 import ReviewModal from "./review-modal"
 import { useState, useEffect } from "react"
-import { getSubmission } from "@/lib/api"
 import { createClient } from "@/lib/supabase/client"
+
+interface SubmissionDocument {
+  id: string
+  file_name: string
+  file_path: string
+  version: number
+  uploaded_at: string
+}
 
 interface Submission {
   id: string
@@ -22,7 +28,7 @@ interface Submission {
   description?: string
   created_at: string
   updated_at: string
-  submission_documents?: any[]
+  submission_documents?: SubmissionDocument[]
 }
 
 interface SubmissionDetailProps {
@@ -63,38 +69,67 @@ export default function SubmissionDetail({
   const [submission, setSubmission] = useState(initialSubmission)
   const [loading, setLoading] = useState(false)
   const [userRole, setUserRole] = useState<string>("")
-  const supabase = createClient()
 
   useEffect(() => {
     const fetchUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
+      try {
+        const supabase = createClient()
+        if (!supabase) return
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
         const { data: profile } = await supabase
           .from("profiles")
           .select("role")
           .eq("id", user.id)
           .single()
+
         if (profile) {
           setUserRole(profile.role)
         }
+      } catch (error) {
+        console.error("Error fetching user role:", error)
       }
     }
+
     fetchUserRole()
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
-    if (!submission.title) {
-      const fetchSubmission = async () => {
-        try {
-          const data = await getSubmission(submission.id)
-          setSubmission(data)
-        } catch (error) {
-          console.error("Failed to fetch submission:", error)
-        }
+    const fetchSubmissionDetails = async () => {
+      if (submission.submission_documents && submission.submission_documents.length > 0) {
+        return
       }
-      fetchSubmission()
+
+      try {
+        const supabase = createClient()
+        if (!supabase) return
+
+        const { data, error } = await supabase
+          .from("submissions")
+          .select(`
+            *,
+            submission_documents(*)
+          `)
+          .eq("id", submission.id)
+          .single()
+
+        if (error) {
+          console.error("Error fetching submission details:", error)
+          return
+        }
+
+        if (data) {
+          setSubmission(data as Submission)
+        }
+      } catch (error) {
+        console.error("Failed to fetch submission details:", error)
+      }
     }
-  }, [submission.id, submission.title])
+
+    fetchSubmissionDetails()
+  }, [submission.id, submission.submission_documents])
 
   // Determine if user can review
   const isSecondaryApprover = ["im", "admin", "senior_instructor"].includes(userRole)
@@ -130,6 +165,67 @@ export default function SubmissionDetail({
   }
 
   const latestDoc = submission.submission_documents?.[0]
+
+  const handleDownload = async () => {
+    if (!latestDoc) return
+
+    try {
+      const supabase = createClient()
+      if (!supabase) {
+        console.error('Supabase client not initialized')
+        return
+      }
+
+      const { data, error } = await supabase.storage
+        .from('submissions')
+        .download(latestDoc.file_path)
+
+      if (error) {
+        console.error('Download error:', error)
+        return
+      }
+
+      // Create download link
+      const url = window.URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = latestDoc.file_name
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Failed to download:', error)
+    }
+  }
+
+  const handleReviewSubmit = async (decision: "approved" | "rejected", comments: string) => {
+    setLoading(true)
+    try {
+      const response = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          submission_id: submission.id,
+          reviewer_role: reviewStage,
+          status: decision,
+          comments,
+        }),
+      })
+
+      if (response.ok) {
+        setShowReviewModal(false)
+        onBack()
+      } else {
+        const error = await response.json()
+        console.error("Review submission failed:", error)
+      }
+    } catch (error) {
+      console.error("Review submission failed:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -217,7 +313,7 @@ export default function SubmissionDetail({
                         variant="ghost"
                         size="sm"
                         className="p-0 h-auto"
-                        onClick={() => console.log("Download:", latestDoc.file_name)}
+                        onClick={handleDownload}
                       >
                         <Download className="w-4 h-4" />
                       </Button>
@@ -292,7 +388,12 @@ export default function SubmissionDetail({
               <CardTitle className="text-lg">Document Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full gap-2" disabled={!latestDoc}>
+              <Button 
+                variant="outline" 
+                className="w-full gap-2" 
+                disabled={!latestDoc}
+                onClick={handleDownload}
+              >
                 <Download className="w-4 h-4" />
                 Download Document
               </Button>
@@ -306,30 +407,7 @@ export default function SubmissionDetail({
           submission={submission}
           stage={reviewStage === "pc" ? "pc" : "amo"}
           onClose={() => setShowReviewModal(false)}
-          onSubmit={async (decision, comments) => {
-            setLoading(true)
-            try {
-              const response = await fetch("/api/reviews", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  submission_id: submission.id,
-                  reviewer_role: reviewStage,
-                  status: decision,
-                  comments,
-                }),
-              })
-
-              if (response.ok) {
-                setShowReviewModal(false)
-                onBack()
-              }
-            } catch (error) {
-              console.error("Review submission failed:", error)
-            } finally {
-              setLoading(false)
-            }
-          }}
+          onSubmit={handleReviewSubmit}
         />
       )}
     </div>

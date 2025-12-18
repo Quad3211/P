@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
+  const { id } = await params
 
   try {
     const {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         submission_documents(*),
         reviews(*)
       `)
-      .eq("id", params.id)
+      .eq("id", id)
       .single()
 
     if (error) throw error
@@ -36,8 +37,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
+  const { id } = await params
 
   try {
     const {
@@ -48,20 +50,31 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     const body = await request.json()
-    const { title, skill_area, cohort, test_date, description, status } = body
+    const {
+      skill_code,
+      skill_area,
+      cluster,
+      cohort,
+      test_date,
+      description,
+      status,
+    } = body
+
 
     const { data, error } = await supabase
       .from("submissions")
       .update({
-        title,
         skill_area,
+        skill_code,
+        cluster,
         cohort,
         test_date,
         description,
         status,
-        submitted_at: status === "submitted" ? new Date().toISOString() : undefined,
+        submitted_at:
+          status === "submitted" ? new Date().toISOString() : undefined,
       })
-      .eq("id", params.id)
+      .eq("id", id)
       .select()
 
     if (error) throw error

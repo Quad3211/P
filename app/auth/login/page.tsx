@@ -12,13 +12,12 @@ import Link from "next/link"
 export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
-  const [emailDomain, setEmailDomain] = useState("@heart-nta.org")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const generateEmail = (user: string, domain: string) => {
-    return `${user.trim().toLowerCase()}${domain}`
+  const generateEmail = (user: string) => {
+    return `${user.trim().toLowerCase()}@heart-nsta.org`
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -34,7 +33,7 @@ export default function LoginPage() {
         return
       }
 
-      const email = generateEmail(username, emailDomain)
+      const email = generateEmail(username)
 
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -59,7 +58,7 @@ export default function LoginPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl">
         {/* Left side branding */}
         <div className="hidden md:flex flex-col justify-center text-white space-y-4">
-          <h1 className="text-5xl font-bold leading-tight">RFA Submission Portal</h1>
+          <h1 className="text-5xl font-bold leading-tight">Submission Portal</h1>
           <p className="text-xl text-slate-300">
             Streamlining test document submissions, reviews, and archiving for educational excellence.
           </p>
@@ -71,36 +70,26 @@ export default function LoginPage() {
             <div className="w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold">✓</span>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">SchoolFlow</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Submission</h2>
           </div>
 
           <h3 className="text-3xl font-bold text-gray-900 mb-2">Sign in to your account</h3>
-          <p className="text-gray-600 mb-8">Enter your email to access the portal.</p>
+          <p className="text-gray-600 mb-8">Enter your username to access the portal.</p>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-              <div className="flex gap-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
                 <Input
                   type="text"
                   placeholder="john.doe"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
-                  className="flex-1"
+                  className="border-none focus:ring-0 flex-1"
                 />
-                <select
-                  value={emailDomain}
-                  onChange={(e) => setEmailDomain(e.target.value)}
-                  className="w-auto px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white"
-                >
-                  <option value="@heart-nta.org">@heart-nta.org</option>
-                  <option value="@heart.nta.org">@heart.nta.org</option>
-                </select>
+                <span className="px-3 text-gray-500 font-medium bg-gray-50">@heart-nsta.org</span>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                {username ? generateEmail(username, emailDomain) : "Enter your username above"}
-              </p>
             </div>
 
             <div>

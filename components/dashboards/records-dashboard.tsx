@@ -31,7 +31,7 @@ export default function RecordsDashboard({ userName }: RecordsDashboardProps) {
   useEffect(() => {
     const fetchSubmissions = async () => {
       try {
-        const data = await getSubmissions("approved")
+        const data:any = await getSubmissions("approved")
         setSubmissions(data)
       } catch (error) {
         console.error("Failed to fetch submissions:", error)

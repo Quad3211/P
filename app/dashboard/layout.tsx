@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import Navigation from "@/components/shared/navigation"
@@ -17,38 +17,24 @@ export default function DashboardLayout({
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-
-  const handleSignOut = useCallback(async () => {
-    const supabase = createClient()
-    if (supabase) {
-      await supabase.auth.signOut()
-    }
-    router.push("/auth/login")
-  }, [router])
+  const supabase = createClient()
+  if(!supabase) return
 
   useEffect(() => {
     const getUser = async () => {
       try {
-        const supabase = createClient()
-        
-        if (!supabase) {
-          console.error("Supabase client not available")
-          router.push("/auth/login")
-          return
-        }
-
         const {
-          data: { user: fetchedUser },
+          data: { user },
         } = await supabase.auth.getUser()
 
-        if (!fetchedUser) {
+        if (!user) {
           router.push("/auth/login")
           return
         }
 
-        setUser(fetchedUser)
+        setUser(user)
 
-        const { data } = await supabase.from("profiles").select("*").eq("id", fetchedUser.id).single()
+        const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
         if (data) {
           setProfile(data)
@@ -58,12 +44,16 @@ export default function DashboardLayout({
       } catch (error) {
         console.error("[v0] Error fetching profile:", error)
         setLoading(false)
-        router.push("/auth/login")
       }
     }
 
     getUser()
-  }, [router])
+  }, [router, supabase])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push("/auth/login")
+  }
 
   if (loading) {
     return (

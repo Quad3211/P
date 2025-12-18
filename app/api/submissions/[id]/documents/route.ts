@@ -1,83 +1,93 @@
 import { createClient } from "@/lib/supabase/server"
-import { type NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+
   const supabase = await createClient()
 
-  try {
-    const { data, error } = await supabase
-      .from("submission_documents")
-      .select("*")
-      .eq("submission_id", params.id)
-      .order("version", { ascending: false })
+  const { data, error } = await supabase
+    .from("submission_documents")
+    .select("*")
+    .eq("submission_id", id)
+    .order("version", { ascending: false })
 
-    if (error) throw error
-
-    return NextResponse.json(data)
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch documents" },
-      { status: 500 },
-    )
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  return NextResponse.json(data)
 }
+
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const supabase = await createClient()
 
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const body = await request.formData()
+    const submissionId = body.get("submissionId") as string
+    const fileBlob = body.get("file") as Blob
+    // Init
+
+    if (!submissionId || !fileBlob) {
+      return NextResponse.json({ error: "Missing submission ID or file" }, { status: 400 })
     }
 
-    const formData = await request.formData()
-    const file = formData.get("file") as File
+    // Check submission exists
+    const { data: submission, error: subError } = await supabase
+      .from("submissions")
+      .select("id, instructor_id")
+      .eq("id", submissionId)
+      .maybeSingle()
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 })
-    }
+    if (subError) return NextResponse.json({ error: subError.message }, { status: 500 })
+    if (!submission) return NextResponse.json({ error: "Submission not found" }, { status: 404 })
+    if (submission.instructor_id !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+    // Upload file
+    const arrayBuffer = await fileBlob.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
 
     const { data: existing } = await supabase
       .from("submission_documents")
       .select("version")
-      .eq("submission_id", params.id)
+      .eq("submission_id", submissionId)
       .order("version", { ascending: false })
       .limit(1)
 
-    const version = (existing && existing.length > 0 ? existing[0].version : 0) + 1
-    const fileName = `${params.id}/v${version}/${file.name}`
+    const version = existing?.[0]?.version ? existing[0].version + 1 : 1
+    const safeName = (fileBlob as any).name?.replace(/\s+/g, "_") || "file"
+    const filePath = `${submissionId}/v${version}/${safeName}`
 
-    // Upload to storage
-    const { error: uploadError } = await supabase.storage.from("submissions").upload(fileName, file, {
-      upsert: true,
-    })
+    const { error: uploadError } = await supabase.storage
+      .from("submissions")
+      .upload(filePath, buffer, { upsert: true })
+    if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
 
-    if (uploadError) throw uploadError
-
-    // Record document metadata
-    const { data, error } = await supabase
+    // Insert metadata
+    const { data: docData, error } = await supabase
       .from("submission_documents")
       .insert({
-        submission_id: params.id,
-        file_name: file.name,
-        file_path: fileName,
-        file_size: file.size,
-        file_type: file.type,
+        submission_id: submissionId,
+        file_name: safeName,
+        file_path: filePath,
+        file_size: fileBlob.size,
+        file_type: fileBlob.type,
         version,
         uploaded_by: user.id,
       })
       .select()
 
-    if (error) throw error
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    return NextResponse.json(data[0], { status: 201 })
+    return NextResponse.json(docData[0], { status: 201 })
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to upload document" },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to upload document" }, { status: 500 })
   }
 }

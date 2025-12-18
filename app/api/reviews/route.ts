@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
 
@@ -8,6 +9,7 @@ export async function POST(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -15,38 +17,51 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { submission_id, reviewer_role, status, comments } = body
 
-    // Get reviewer role
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+    // Get reviewer profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
 
-    // Allow PC, AMO, IM, and Admin to review
-    const allowedRoles = ["pc", "amo", "im", "admin"]
-    if (!allowedRoles.includes(profile?.role || "")) {
-      return NextResponse.json({ error: "Unauthorized to review" }, { status: 403 })
+    if (profile?.role !== reviewer_role && profile?.role !== "admin") {
+      return NextResponse.json(
+        { error: "Unauthorized to review as this role" },
+        { status: 403 }
+      )
     }
 
-    // Validate reviewer role matches or is secondary approver
-    const isSecondaryApprover = ["im", "admin"].includes(profile?.role || "")
-    const isPrimaryReviewer = profile?.role === reviewer_role
-
-    if (!isPrimaryReviewer && !isSecondaryApprover) {
-      return NextResponse.json({ error: "Unauthorized to review as this role" }, { status: 403 })
-    }
-
-    // Get submission details for logging
+    // Fetch submission (FULL DATA — needed for email)
     const { data: submission } = await supabase
       .from("submissions")
-      .select("submission_id, title, status, instructor_name")
+      .select("id, status, title, instructor_email, instructor_name")
       .eq("id", submission_id)
       .single()
 
-    // Create or update review
+    if (!submission) {
+      return NextResponse.json({ error: "Submission not found" }, { status: 404 })
+    }
+
+    // AMO guard
+    if (
+      reviewer_role === "amo" &&
+      submission.status !== "pc_approved" &&
+      profile?.role !== "admin"
+    ) {
+      return NextResponse.json(
+        { error: "Submission must be PC approved before AMO review" },
+        { status: 403 }
+      )
+    }
+
+    // Upsert review
     const { data: reviewData, error: reviewError } = await supabase
       .from("reviews")
       .upsert({
         submission_id,
         reviewer_id: user.id,
-        reviewer_role: isSecondaryApprover ? "secondary" : reviewer_role,
-        status,
+        reviewer_role,
+        status, // approved | rejected
         comments,
         reviewed_at: new Date().toISOString(),
       })
@@ -54,46 +69,42 @@ export async function POST(request: NextRequest) {
 
     if (reviewError) throw reviewError
 
-    // Update submission status based on review
-    let newSubmissionStatus = submission?.status
-    if (status === "approved") {
-      if (reviewer_role === "pc" || (isSecondaryApprover && submission?.status === "submitted")) {
-        newSubmissionStatus = "amo_review"
-      } else if (reviewer_role === "amo" || (isSecondaryApprover && submission?.status === "amo_review")) {
-        newSubmissionStatus = "approved"
-      }
-    } else if (status === "rejected") {
-      newSubmissionStatus = "rejected"
+    // Map workflow status
+    let newStatus: string | null = null
+
+    if (reviewer_role === "pc") {
+      newStatus = status === "approved" ? "pc_approved" : "pc_rejected"
     }
 
-    await supabase.from("submissions").update({ status: newSubmissionStatus }).eq("id", submission_id)
+    if (reviewer_role === "amo") {
+      newStatus = status === "approved" ? "amo_approved" : "amo_rejected"
+    }
 
-    // Create comprehensive audit log
-    await supabase.from("audit_logs").insert({
-      user_id: user.id,
-      action: isSecondaryApprover
-        ? `Secondary review (${profile?.role}): ${status} submission`
-        : `${reviewer_role.toUpperCase()} review: ${status} submission`,
-      action_type: status,
-      submission_id: submission_id,
-      details: {
-        reviewer_name: profile?.full_name,
-        reviewer_role: profile?.role,
-        review_type: isSecondaryApprover ? "secondary" : "primary",
-        previous_status: submission?.status,
-        new_status: newSubmissionStatus,
-        comments: comments,
-        submission_title: submission?.title,
-        submission_id: submission?.submission_id,
-      },
-    })
+    // Update submission status
+    if (newStatus) {
+      const { error: updateError } = await supabase
+        .from("submissions")
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", submission_id)
+
+      if (updateError) throw updateError
+    }
 
     return NextResponse.json(reviewData[0], { status: 201 })
   } catch (error) {
-    console.error("Review error:", error)
+    console.error("Review API error:", error)
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create review" },
-      { status: 500 },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create review",
+      },
+      { status: 500 }
     )
   }
 }
@@ -105,6 +116,7 @@ export async function GET(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -112,13 +124,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const submissionId = searchParams.get("submission_id")
 
-    let query = supabase
-      .from("reviews")
-      .select(`
-        *,
-        reviewer:reviewer_id(full_name, email, role)
-      `)
-      .order("created_at", { ascending: false })
+    let query = supabase.from("reviews").select("*")
 
     if (submissionId) {
       query = query.eq("submission_id", submissionId)

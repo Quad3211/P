@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import SubmissionDetail from "@/components/shared/submission-detail"
 import { AlertCircle, CheckCircle, Eye } from "lucide-react"
-import { getSubmissions } from "@/lib/api"
+import { createClient } from "@/lib/supabase/client"
 
 interface Submission {
   id: string
@@ -16,8 +16,11 @@ interface Submission {
   cohort: string
   status: string
   instructor_name: string
+  instructor_email: string
   created_at: string
   updated_at: string
+  test_date: string
+  description?: string
 }
 
 interface IMDashboardProps {
@@ -33,10 +36,27 @@ export default function IMDashboard({ userName }: IMDashboardProps) {
   useEffect(() => {
     const fetchSubmissions = async () => {
       try {
-        const data = await getSubmissions()
-        setSubmissions(data)
+        setLoading(true)
+        const supabase = createClient()
+        
+        if (!supabase) {
+          console.error('Supabase client not initialized')
+          return
+        }
+
+        const { data, error } = await supabase
+          .from('submissions')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.error('Error fetching submissions:', error)
+          return
+        }
+
+        setSubmissions(data as Submission[] || [])
       } catch (error) {
-        console.error("Failed to fetch submissions:", error)
+        console.error('Failed to fetch submissions:', error)
       } finally {
         setLoading(false)
       }
@@ -82,7 +102,7 @@ export default function IMDashboard({ userName }: IMDashboardProps) {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">IM Dashboard</h1>
-          <p className="text-slate-600">Information Management & Secondary Approval Authority</p>
+          <p className="text-slate-600">Institution Manager & Secondary Approval Authority</p>
         </div>
 
         {/* Stats Cards */}

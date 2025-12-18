@@ -37,21 +37,49 @@ export async function GET(request: NextRequest) {
 
     const { data: submissions } = await submissionsQuery
 
-    // Get pending reviews for user
+    // Get pending reviews for user - FIXED: Separate queries
     const { data: reviews } = await supabase
       .from("reviews")
-      .select("id, submission_id, reviewer_role, created_at, submissions(submission_id, title)")
+      .select("id, submission_id, reviewer_role, created_at")
       .eq("reviewer_id", user.id)
       .eq("status", "pending")
+
+    // Get submission details for reviews
+    let reviewsWithSubmissions = []
+    if (reviews && reviews.length > 0) {
+      const submissionIds = reviews.map(r => r.submission_id)
+      const { data: reviewSubmissions } = await supabase
+        .from("submissions")
+        .select("id, submission_id, title")
+        .in("id", submissionIds)
+
+      // Map reviews with their submission data
+      reviewsWithSubmissions = reviews.map(review => {
+        const submission = reviewSubmissions?.find(s => s.id === review.submission_id)
+        return {
+          ...review,
+          submission: submission || null
+        }
+      })
+    }
 
     // Get role change notifications
     const { data: roleChanges } = await supabase
       .from("audit_logs")
       .select("id, action, created_at, details")
       .eq("action_type", "role_change")
-      .contains("details", { target_user_id: user.id })
       .order("created_at", { ascending: false })
-      .limit(5)
+      .limit(50) // Get more initially, then filter
+
+    // Filter role changes for current user
+    const userRoleChanges = roleChanges?.filter(rc => {
+      try {
+        const details = typeof rc.details === 'string' ? JSON.parse(rc.details) : rc.details
+        return details?.target_user_id === user.id
+      } catch {
+        return false
+      }
+    }).slice(0, 5) || []
 
     const notifications = [
       // Submission status updates
@@ -60,7 +88,7 @@ export async function GET(request: NextRequest) {
         new Date(s.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
       ).map((s) => ({
         id: `sub-${s.id}`,
-        type: "submission",
+        type: "submission" as const,
         title: `${s.title} - ${s.status.replace(/_/g, ' ').toUpperCase()}`,
         message: `Submission has been ${s.status.replace(/_/g, " ")}`,
         timestamp: s.updated_at,
@@ -69,25 +97,25 @@ export async function GET(request: NextRequest) {
       })) || []),
       
       // Pending reviews
-      ...(reviews?.map((r) => ({
+      ...(reviewsWithSubmissions.map((r) => ({
         id: `rev-${r.id}`,
-        type: "review",
+        type: "review" as const,
         title: `Review Required`,
-        message: `${r.submissions?.title || 'A submission'} is pending your ${r.reviewer_role.toUpperCase()} review`,
+        message: `${r.submission?.title || 'A submission'} is pending your ${r.reviewer_role.toUpperCase()} review`,
         timestamp: r.created_at,
         read: false,
-        submission_id: r.submissions?.submission_id,
-      })) || []),
+        submission_id: r.submission?.submission_id,
+      }))),
       
       // Role change notifications
-      ...(roleChanges?.map((rc) => ({
+      ...(userRoleChanges.map((rc) => ({
         id: `role-${rc.id}`,
-        type: "role_change",
+        type: "role_change" as const,
         title: `Your Role Has Been Updated`,
         message: rc.action,
         timestamp: rc.created_at,
         read: false,
-      })) || []),
+      }))),
     ]
 
     // Sort by timestamp and limit to 20
@@ -95,6 +123,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(notifications.slice(0, 20))
   } catch (error) {
+    console.error("Notifications error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch notifications" },
       { status: 500 },

@@ -197,7 +197,7 @@ export default function InstructorDashboard({ userName }: InstructorDashboardPro
             {loading ? (
               <div className="text-center py-8 text-slate-600">Loading submissions...</div>
             ) : filteredSubmissions.length === 0 ? (
-              <div className="text-center py-8 text-slate-600">No submissions yet</div>
+              <div className="text-center py-8 text-slate-600">no submissions yet</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
