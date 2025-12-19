@@ -1,7 +1,10 @@
+"use client"
+
 import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 
 // UI Components
-const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "" }) => (
+const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "" }: any) => (
   <button
     onClick={onClick}
     disabled={disabled}
@@ -17,18 +20,21 @@ const Button = ({ children, onClick, disabled, variant = "default", size = "defa
   </button>
 )
 
-const Card = ({ children, className = "" }) => <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
-const CardHeader = ({ children, className = "" }) => <div className={`p-6 border-b ${className}`}>{children}</div>
-const CardTitle = ({ children, className = "" }) => <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
-const CardContent = ({ children, className = "" }) => <div className={`p-6 ${className}`}>{children}</div>
-const Badge = ({ children, className = "" }) => <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>{children}</span>
-const Input = ({ value, onChange, placeholder, className = "" }) => (
+const Card = ({ children, className = "" }: any) => <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
+const CardHeader = ({ children, className = "" }: any) => <div className={`p-6 border-b ${className}`}>{children}</div>
+const CardTitle = ({ children, className = "" }: any) => <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
+const CardContent = ({ children, className = "" }: any) => <div className={`p-6 ${className}`}>{children}</div>
+const Badge = ({ children, className = "" }: any) => <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>{children}</span>
+const Input = ({ value, onChange, placeholder, className = "" }: any) => (
   <input type="text" value={value} onChange={onChange} placeholder={placeholder} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
 )
-const Label = ({ children, htmlFor }) => <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">{children}</label>
-const Alert = ({ children, className = "" }) => <div className={`rounded-lg p-4 border ${className}`}>{children}</div>
+const Label = ({ children, htmlFor }: any) => <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">{children}</label>
+const Alert = ({ children, className = "" }: any) => <div className={`rounded-lg p-4 border ${className}`}>{children}</div>
+const Textarea = ({ value, onChange, placeholder, rows = 3, className = "" }: any) => (
+  <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
+)
 
-const ROLE_INFO = {
+const ROLE_INFO: Record<string, any> = {
   instructor: { label: "Instructor", description: "Submit and track submissions", color: "bg-blue-100 text-blue-800" },
   senior_instructor: { label: "Senior Instructor", description: "Secondary approval for PC reviews", color: "bg-purple-100 text-purple-800" },
   pc: { label: "PC Reviewer", description: "Primary reviewer - first level", color: "bg-yellow-100 text-yellow-800" },
@@ -38,36 +44,79 @@ const ROLE_INFO = {
   head_of_programs: { label: "Head of Programs", description: "System administrator - all institutions", color: "bg-red-100 text-red-800" }
 }
 
-const INSTITUTION_COLORS = {
+const INSTITUTION_COLORS: Record<string, string> = {
   "Boys Town": "bg-blue-100 text-blue-800",
   "Stony Hill": "bg-green-100 text-green-800",
   "Leap": "bg-purple-100 text-purple-800"
 }
 
-const mockUsers = [
-  { id: "1", email: "john.doe@heart-nsta.org", full_name: "John Doe", role: "instructor", institution: "Boys Town", approval_status: "pending", created_at: new Date().toISOString() },
-  { id: "2", email: "jane.smith@heart-nsta.org", full_name: "Jane Smith", role: "instructor", institution: "Stony Hill", approval_status: "approved", created_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: "3", email: "bob.wilson@heart-nsta.org", full_name: "Bob Wilson", role: "pc", institution: "Boys Town", approval_status: "approved", created_at: new Date(Date.now() - 172800000).toISOString() },
-  { id: "4", email: "alice.jones@heart-nsta.org", full_name: "Alice Jones", role: "instructor", institution: "Leap", approval_status: "pending", created_at: new Date(Date.now() - 3600000).toISOString() },
-  { id: "5", email: "mike.brown@heart-nsta.org", full_name: "Mike Brown", role: "amo", institution: "Stony Hill", approval_status: "approved", created_at: new Date(Date.now() - 259200000).toISOString() }
-]
+interface User {
+  id: string
+  email: string
+  full_name: string
+  role: string
+  institution: string
+  approval_status: string
+  created_at: string
+  rejected_reason?: string
+}
 
 export default function HeadOfProgramsUserManagement() {
-  const [users, setUsers] = useState(mockUsers)
-  const [filteredUsers, setFilteredUsers] = useState(mockUsers)
+  const supabase = createClient()
+  
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterInstitution, setFilterInstitution] = useState("")
   const [filterStatus, setFilterStatus] = useState("")
-  const [selectedUser, setSelectedUser] = useState(null)
-  const [modalType, setModalType] = useState(null)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [modalType, setModalType] = useState<string | null>(null)
   const [newRole, setNewRole] = useState("instructor")
   const [rejectReason, setRejectReason] = useState("")
   const [removeReason, setRemoveReason] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
+  // Fetch users from API
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      if (!supabase) {
+        setError("Database connection not available")
+        return
+      }
+
+      // Fetch all users - Head of Programs can see all
+      const { data, error: fetchError } = await supabase
+        .from("profiles")
+        .select("id, email, full_name, role, institution, approval_status, created_at, rejected_reason")
+        .order("created_at", { ascending: false })
+
+      if (fetchError) throw fetchError
+
+      setUsers(data || [])
+    } catch (err: any) {
+      console.error("Error fetching users:", err)
+      setError(err.message || "Failed to fetch users")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Filter users
   useEffect(() => {
     let filtered = users
     if (searchQuery) {
-      filtered = filtered.filter(u => u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()))
+      filtered = filtered.filter(u => 
+        u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        u.email.toLowerCase().includes(searchQuery.toLowerCase())
+      )
     }
     if (filterInstitution) filtered = filtered.filter(u => u.institution === filterInstitution)
     if (filterStatus) filtered = filtered.filter(u => u.approval_status === filterStatus)
@@ -79,38 +128,131 @@ export default function HeadOfProgramsUserManagement() {
   const rejectedCount = users.filter(u => u.approval_status === "rejected").length
   const institutions = [...new Set(users.map(u => u.institution))]
 
-  const handleApprove = (userId) => {
-    setUsers(users.map(u => u.id === userId ? { ...u, approval_status: "approved", approved_at: new Date().toISOString() } : u))
-    setModalType(null)
-    setSelectedUser(null)
+  const handleApprove = async (userId: string) => {
+    try {
+      const response = await fetch("/api/users/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action: "approve" })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to approve user")
+      }
+
+      await fetchUsers()
+      setModalType(null)
+      setSelectedUser(null)
+    } catch (err: any) {
+      alert(err.message || "Failed to approve user")
+    }
   }
 
-  const handleReject = (userId) => {
-    if (!rejectReason.trim()) { alert("Please provide a reason for rejection"); return }
-    setUsers(users.map(u => u.id === userId ? { ...u, approval_status: "rejected", rejected_reason: rejectReason } : u))
-    setModalType(null)
-    setSelectedUser(null)
-    setRejectReason("")
+  const handleReject = async (userId: string) => {
+    if (!rejectReason.trim()) {
+      alert("Please provide a reason for rejection")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/users/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action: "reject", reason: rejectReason })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to reject user")
+      }
+
+      await fetchUsers()
+      setModalType(null)
+      setSelectedUser(null)
+      setRejectReason("")
+    } catch (err: any) {
+      alert(err.message || "Failed to reject user")
+    }
   }
 
-  const handleUpdateRole = (userId) => {
-    setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u))
-    setModalType(null)
-    setSelectedUser(null)
+  const handleUpdateRole = async (userId: string) => {
+    try {
+      const response = await fetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, role: newRole })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to update role")
+      }
+
+      await fetchUsers()
+      setModalType(null)
+      setSelectedUser(null)
+    } catch (err: any) {
+      alert(err.message || "Failed to update role")
+    }
   }
 
-  const handleRemoveUser = (userId) => {
-    if (!removeReason.trim()) { alert("Please provide a reason for removal"); return }
-    setUsers(users.filter(u => u.id !== userId))
-    setModalType(null)
-    setSelectedUser(null)
-    setRemoveReason("")
+  const handleRemoveUser = async (userId: string) => {
+    if (!removeReason.trim()) {
+      alert("Please provide a reason for removal")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/users/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, reason: removeReason })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to remove user")
+      }
+
+      await fetchUsers()
+      setModalType(null)
+      setSelectedUser(null)
+      setRemoveReason("")
+    } catch (err: any) {
+      alert(err.message || "Failed to remove user")
+    }
   }
 
-  const openModal = (type, user) => {
+  const openModal = (type: string, user: User) => {
     setSelectedUser(user)
     setModalType(type)
     if (type === 'role') setNewRole(user.role)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
+          <p className="mt-4 text-gray-600">Loading users...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Alert className="max-w-md bg-red-50 border-red-200">
+          <p className="text-red-900 font-semibold">Error loading users</p>
+          <p className="text-red-700 text-sm mt-1">{error}</p>
+          <Button onClick={fetchUsers} variant="outline" className="mt-4">
+            Retry
+          </Button>
+        </Alert>
+      </div>
+    )
   }
 
   return (
@@ -146,7 +288,7 @@ export default function HeadOfProgramsUserManagement() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="md:col-span-2">
                 <Label htmlFor="search">Search</Label>
-                <Input id="search" placeholder="Search by name or email..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                <Input id="search" placeholder="Search by name or email..." value={searchQuery} onChange={(e: any) => setSearchQuery(e.target.value)} />
               </div>
               <div>
                 <Label htmlFor="institution">Institution</Label>
@@ -167,7 +309,7 @@ export default function HeadOfProgramsUserManagement() {
             </div>
             {(searchQuery || filterInstitution || filterStatus) && (
               <div className="mt-4 flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setSearchQuery(""); setFilterInstitution(""); setFilterStatus("") } } children={undefined} disabled={undefined}>Clear Filters</Button>
+                <Button variant="outline" size="sm" onClick={() => { setSearchQuery(""); setFilterInstitution(""); setFilterStatus("") }}>Clear Filters</Button>
                 <span className="text-sm text-gray-600">Showing {filteredUsers.length} of {users.length} users</span>
               </div>
             )}
@@ -198,14 +340,24 @@ export default function HeadOfProgramsUserManagement() {
                         <td className="px-4 py-3 text-gray-600">{user.email}</td>
                         <td className="px-4 py-3"><Badge className={INSTITUTION_COLORS[user.institution]}>{user.institution}</Badge></td>
                         <td className="px-4 py-3"><Badge className={roleInfo?.color || "bg-gray-100"}>{roleInfo?.label || user.role}</Badge></td>
-                        <td className="px-4 py-3"><Badge className={user.approval_status === "approved" ? "bg-green-100 text-green-800" : user.approval_status === "pending" ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"}>{user.approval_status}</Badge></td>
+                        <td className="px-4 py-3">
+                          <Badge className={
+                            user.approval_status === "approved" ? "bg-green-100 text-green-800" : 
+                            user.approval_status === "pending" ? "bg-amber-100 text-amber-800" : 
+                            "bg-red-100 text-red-800"
+                          }>
+                            {user.approval_status}
+                          </Badge>
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
-                            {user.approval_status === "pending" && <Button size="sm" variant="outline" onClick={() => openModal('approval', user)} children={undefined} disabled={undefined}>Review</Button>}
+                            {user.approval_status === "pending" && (
+                              <Button size="sm" variant="outline" onClick={() => openModal('approval', user)}>Review</Button>
+                            )}
                             {user.approval_status === "approved" && (
                               <>
-                                <Button size="sm" variant="outline" onClick={() => openModal('role', user)} children={undefined} disabled={undefined}>Change Role</Button>
-                                <Button size="sm" variant="outline" onClick={() => openModal('remove', user)} className="text-red-600" children={undefined} disabled={undefined}>🚫</Button>
+                                <Button size="sm" variant="outline" onClick={() => openModal('role', user)}>Change Role</Button>
+                                <Button size="sm" variant="outline" onClick={() => openModal('remove', user)} className="text-red-600">🚫</Button>
                               </>
                             )}
                           </div>
@@ -234,13 +386,13 @@ export default function HeadOfProgramsUserManagement() {
                     </div>
                     <div>
                       <Label htmlFor="reject-reason">Rejection Reason (if rejecting)</Label>
-                      <Input id="reject-reason" placeholder="Enter reason for rejection..." value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+                      <Textarea id="reject-reason" placeholder="Enter reason for rejection..." value={rejectReason} onChange={(e: any) => setRejectReason(e.target.value)} />
                     </div>
                   </div>
                   <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => setModalType(null)} children={undefined} disabled={undefined}>Cancel</Button>
-                    <Button variant="outline" onClick={() => handleReject(selectedUser.id)} className="text-red-600" children={undefined} disabled={undefined}>Reject</Button>
-                    <Button onClick={() => handleApprove(selectedUser.id)} children={undefined} disabled={undefined}>✓ Approve</Button>
+                    <Button variant="outline" onClick={() => setModalType(null)}>Cancel</Button>
+                    <Button variant="outline" onClick={() => handleReject(selectedUser.id)} className="text-red-600">Reject</Button>
+                    <Button onClick={() => handleApprove(selectedUser.id)}>✓ Approve</Button>
                   </div>
                 </>
               )}
@@ -253,13 +405,15 @@ export default function HeadOfProgramsUserManagement() {
                     <div>
                       <Label htmlFor="role">Select New Role</Label>
                       <select id="role" value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full px-3 py-2 border rounded-md">
-                        {Object.entries(ROLE_INFO).map(([role, info]) => <option key={role} value={role}>{info.label} - {info.description}</option>)}
+                        {Object.entries(ROLE_INFO).map(([role, info]) => (
+                          <option key={role} value={role}>{info.label} - {info.description}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
                   <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => setModalType(null)} children={undefined} disabled={undefined}>Cancel</Button>
-                    <Button onClick={() => handleUpdateRole(selectedUser.id)} children={undefined} disabled={undefined}>Update Role</Button>
+                    <Button variant="outline" onClick={() => setModalType(null)}>Cancel</Button>
+                    <Button onClick={() => handleUpdateRole(selectedUser.id)}>Update Role</Button>
                   </div>
                 </>
               )}
@@ -275,11 +429,11 @@ export default function HeadOfProgramsUserManagement() {
                   </Alert>
                   <div className="mb-6">
                     <Label htmlFor="remove-reason">Reason for Removal <span className="text-red-500">*</span></Label>
-                    <Input id="remove-reason" placeholder="Enter reason for removal..." value={removeReason} onChange={(e) => setRemoveReason(e.target.value)} />
+                    <Textarea id="remove-reason" placeholder="Enter reason for removal..." value={removeReason} onChange={(e: any) => setRemoveReason(e.target.value)} />
                   </div>
                   <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => setModalType(null)} children={undefined} disabled={undefined}>Cancel</Button>
-                    <Button onClick={() => handleRemoveUser(selectedUser.id)} className="bg-red-600 hover:bg-red-700 text-white" children={undefined} disabled={undefined}>Remove User</Button>
+                    <Button variant="outline" onClick={() => setModalType(null)}>Cancel</Button>
+                    <Button onClick={() => handleRemoveUser(selectedUser.id)} className="bg-red-600 hover:bg-red-700 text-white">Remove User</Button>
                   </div>
                 </>
               )}

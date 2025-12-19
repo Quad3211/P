@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react"
+"use client"
 
-// Reusing same UI components from previous artifact
-const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "" }) => (
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
+
+// Reusing same UI components
+const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "" }: any) => (
   <button
     onClick={onClick}
     disabled={disabled}
@@ -17,29 +20,29 @@ const Button = ({ children, onClick, disabled, variant = "default", size = "defa
   </button>
 )
 
-const Card = ({ children, className = "" }) => (
+const Card = ({ children, className = "" }: any) => (
   <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
 )
 
-const CardHeader = ({ children }) => (
+const CardHeader = ({ children }: any) => (
   <div className="p-6 border-b">{children}</div>
 )
 
-const CardTitle = ({ children, className = "" }) => (
+const CardTitle = ({ children, className = "" }: any) => (
   <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
 )
 
-const CardContent = ({ children }) => (
+const CardContent = ({ children }: any) => (
   <div className="p-6">{children}</div>
 )
 
-const Badge = ({ children, className = "" }) => (
+const Badge = ({ children, className = "" }: any) => (
   <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>
     {children}
   </span>
 )
 
-const Input = ({ value, onChange, placeholder }) => (
+const Input = ({ value, onChange, placeholder }: any) => (
   <input
     type="text"
     value={value}
@@ -49,13 +52,13 @@ const Input = ({ value, onChange, placeholder }) => (
   />
 )
 
-const Label = ({ children, htmlFor }) => (
+const Label = ({ children, htmlFor }: any) => (
   <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">
     {children}
   </label>
 )
 
-const Alert = ({ children, className = "" }) => (
+const Alert = ({ children, className = "" }: any) => (
   <div className={`rounded-lg p-4 border ${className}`}>{children}</div>
 )
 
@@ -65,7 +68,7 @@ const Building2 = () => <span>🏢</span>
 const Award = () => <span>🏆</span>
 const Shield = () => <span>🛡️</span>
 
-const ROLE_INFO = {
+const ROLE_INFO: Record<string, any> = {
   instructor: {
     label: "Instructor",
     description: "Submit and track submissions",
@@ -98,42 +101,90 @@ const ROLE_INFO = {
   }
 }
 
-// Mock data - only users from Boys Town
-const mockUsers = [
-  {
-    id: "1",
-    email: "john.doe@heart-nsta.org",
-    full_name: "John Doe",
-    role: "instructor",
-    institution: "Boys Town",
-    created_at: new Date().toISOString()
-  },
-  {
-    id: "2",
-    email: "bob.wilson@heart-nsta.org",
-    full_name: "Bob Wilson",
-    role: "pc",
-    institution: "Boys Town",
-    created_at: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    id: "3",
-    email: "alice.johnson@heart-nsta.org",
-    full_name: "Alice Johnson",
-    role: "senior_instructor",
-    institution: "Boys Town",
-    created_at: new Date(Date.now() - 172800000).toISOString()
-  }
-]
+interface User {
+  id: string
+  email: string
+  full_name: string
+  role: string
+  institution: string
+  created_at: string
+}
 
 export default function InstitutionManagerUserManagement() {
-  const currentInstitution = "Boys Town" // This would come from user context
-  const [users, setUsers] = useState(mockUsers)
-  const [filteredUsers, setFilteredUsers] = useState(mockUsers)
+  const supabase = createClient()
+  const [currentInstitution, setCurrentInstitution] = useState("")
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedUser, setSelectedUser] = useState(null)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [newRole, setNewRole] = useState("instructor")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchCurrentUserAndInstitution()
+  }, [])
+
+  const fetchCurrentUserAndInstitution = async () => {
+    try {
+      if (!supabase) {
+        setError("Database connection not available")
+        return
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setError("Not authenticated")
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("institution, role")
+        .eq("id", user.id)
+        .single()
+
+      if (!profile) {
+        setError("Profile not found")
+        return
+      }
+
+      if (profile.role !== "institution_manager") {
+        setError("Unauthorized - Institution Manager access only")
+        return
+      }
+
+      setCurrentInstitution(profile.institution)
+      await fetchUsers(profile.institution)
+    } catch (err: any) {
+      console.error("Error:", err)
+      setError(err.message || "Failed to load data")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchUsers = async (institution: string) => {
+    try {
+      if (!supabase) return
+
+      const { data, error: fetchError } = await supabase
+        .from("profiles")
+        .select("id, email, full_name, role, institution, created_at")
+        .eq("institution", institution)
+        .eq("approval_status", "approved")
+        .order("full_name", { ascending: true })
+
+      if (fetchError) throw fetchError
+
+      setUsers(data || [])
+      setFilteredUsers(data || [])
+    } catch (err: any) {
+      console.error("Error fetching users:", err)
+      setError(err.message || "Failed to fetch users")
+    }
+  }
 
   useEffect(() => {
     if (searchQuery) {
@@ -150,7 +201,7 @@ export default function InstitutionManagerUserManagement() {
   }, [searchQuery, users])
 
   const getRoleStats = () => {
-    const stats = {}
+    const stats: Record<string, number> = {}
     users.forEach((user) => {
       stats[user.role] = (stats[user.role] || 0) + 1
     })
@@ -159,18 +210,55 @@ export default function InstitutionManagerUserManagement() {
 
   const roleStats = getRoleStats()
 
-  const handleRoleChange = (user) => {
+  const handleRoleChange = (user: User) => {
     setSelectedUser(user)
     setNewRole(user.role)
     setIsModalOpen(true)
   }
 
-  const handleUpdateRole = () => {
-    setUsers(users.map(u => 
-      u.id === selectedUser.id ? { ...u, role: newRole } : u
-    ))
-    setIsModalOpen(false)
-    setSelectedUser(null)
+  const handleUpdateRole = async () => {
+    if (!selectedUser) return
+
+    try {
+      const response = await fetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: selectedUser.id, role: newRole })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to update role")
+      }
+
+      await fetchUsers(currentInstitution)
+      setIsModalOpen(false)
+      setSelectedUser(null)
+    } catch (err: any) {
+      alert(err.message || "Failed to update role")
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Alert className="max-w-md bg-red-50 border-red-200">
+          <p className="text-red-900 font-semibold">Error</p>
+          <p className="text-red-700 text-sm mt-1">{error}</p>
+        </Alert>
+      </div>
+    )
   }
 
   return (
@@ -219,7 +307,7 @@ export default function InstitutionManagerUserManagement() {
           ))}
         </div>
 
-        {/* Search */}
+        {/* Search & Users Table */}
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -234,7 +322,7 @@ export default function InstitutionManagerUserManagement() {
                 id="search"
                 placeholder="Search by name, email, or role..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e: any) => setSearchQuery(e.target.value)}
               />
             </div>
 
@@ -269,12 +357,12 @@ export default function InstitutionManagerUserManagement() {
                           {canApprovePC || canApproveAMO ? (
                             <div className="flex gap-1">
                               {canApprovePC && (
-                                <Badge variant="outline" className="text-xs">
+                                <Badge className="border border-yellow-300 bg-yellow-50 text-yellow-800 text-xs">
                                   PC
                                 </Badge>
                               )}
                               {canApproveAMO && (
-                                <Badge variant="outline" className="text-xs">
+                                <Badge className="border border-orange-300 bg-orange-50 text-orange-800 text-xs">
                                   AMO
                                 </Badge>
                               )}
