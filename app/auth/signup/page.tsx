@@ -1,7 +1,5 @@
-// app/auth/signup/page.tsx
 "use client"
 
-import type React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -45,7 +43,7 @@ export default function SignupPage() {
           data: {
             full_name: fullName,
             institution: institution,
-            // Role is always instructor for new signups
+            // Role will be set to 'instructor' by the database trigger
           },
         },
       })
@@ -116,7 +114,6 @@ export default function SignupPage() {
           Create your instructor account. Your registration will be reviewed by the Head of Programs.
         </p>
 
-        {/* Info Alert */}
         <Alert className="mb-6 bg-blue-50 border-blue-200">
           <AlertCircle className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-900">
@@ -192,7 +189,8 @@ export default function SignupPage() {
 
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
             <p className="text-sm text-amber-900">
-              <strong>Important:</strong> After registration, you must wait for approval from the <strong>Head of Programs</strong> before you can sign in.
+              <strong>Important:</strong> After registration, you must wait for approval from the{" "}
+              <strong>Head of Programs</strong> before you can sign in.
             </p>
           </div>
 

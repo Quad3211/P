@@ -1,33 +1,71 @@
-"use client"
-
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Users, Search, Shield, Award, RefreshCw, Building2 } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
 
-interface User {
-  id: string
-  email: string
-  full_name: string
-  role: string
-  institution: string
-  created_at: string
-}
+// Reusing same UI components from previous artifact
+const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "" }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`px-4 py-2 rounded font-medium transition-colors ${
+      variant === "outline" 
+        ? "border border-gray-300 hover:bg-gray-50" 
+        : variant === "ghost"
+        ? "hover:bg-gray-100"
+        : "bg-cyan-500 text-white hover:bg-cyan-600"
+    } ${size === "sm" ? "text-sm px-3 py-1" : ""} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className}`}
+  >
+    {children}
+  </button>
+)
 
-type UserRole = "instructor" | "senior_instructor" | "pc" | "amo" | "im" | "registration" | "records" | "admin"
+const Card = ({ children, className = "" }) => (
+  <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
+)
 
-const ROLE_INFO: Record<UserRole, { label: string; description: string; color: string }> = {
+const CardHeader = ({ children }) => (
+  <div className="p-6 border-b">{children}</div>
+)
+
+const CardTitle = ({ children, className = "" }) => (
+  <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
+)
+
+const CardContent = ({ children }) => (
+  <div className="p-6">{children}</div>
+)
+
+const Badge = ({ children, className = "" }) => (
+  <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>
+    {children}
+  </span>
+)
+
+const Input = ({ value, onChange, placeholder }) => (
+  <input
+    type="text"
+    value={value}
+    onChange={onChange}
+    placeholder={placeholder}
+    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+  />
+)
+
+const Label = ({ children, htmlFor }) => (
+  <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">
+    {children}
+  </label>
+)
+
+const Alert = ({ children, className = "" }) => (
+  <div className={`rounded-lg p-4 border ${className}`}>{children}</div>
+)
+
+// Icons
+const Users = () => <span>👥</span>
+const Building2 = () => <span>🏢</span>
+const Award = () => <span>🏆</span>
+const Shield = () => <span>🛡️</span>
+
+const ROLE_INFO = {
   instructor: {
     label: "Instructor",
     description: "Submit and track submissions",
@@ -48,48 +86,54 @@ const ROLE_INFO: Record<UserRole, { label: string; description: string; color: s
     description: "Primary reviewer - final approval",
     color: "bg-orange-100 text-orange-800"
   },
-  im: {
-    label: "IM",
-    description: "Institution Manager - manages users",
+  institution_manager: {
+    label: "Institution Manager",
+    description: "Manages users within institution",
     color: "bg-cyan-100 text-cyan-800"
-  },
-  registration: {
-    label: "Registration",
-    description: "View submissions",
-    color: "bg-gray-100 text-gray-800"
   },
   records: {
     label: "Records Manager",
     description: "Archive and manage records",
     color: "bg-green-100 text-green-800"
-  },
-  admin: {
-    label: "Administrator",
-    description: "Full system access",
-    color: "bg-red-100 text-red-800"
   }
 }
 
-const INSTITUTION_COLORS: Record<string, string> = {
-  "Boys Town": "bg-blue-100 text-blue-800",
-  "Stony Hill": "bg-green-100 text-green-800",
-  "Leap": "bg-purple-100 text-purple-800"
-}
+// Mock data - only users from Boys Town
+const mockUsers = [
+  {
+    id: "1",
+    email: "john.doe@heart-nsta.org",
+    full_name: "John Doe",
+    role: "instructor",
+    institution: "Boys Town",
+    created_at: new Date().toISOString()
+  },
+  {
+    id: "2",
+    email: "bob.wilson@heart-nsta.org",
+    full_name: "Bob Wilson",
+    role: "pc",
+    institution: "Boys Town",
+    created_at: new Date(Date.now() - 86400000).toISOString()
+  },
+  {
+    id: "3",
+    email: "alice.johnson@heart-nsta.org",
+    full_name: "Alice Johnson",
+    role: "senior_instructor",
+    institution: "Boys Town",
+    created_at: new Date(Date.now() - 172800000).toISOString()
+  }
+]
 
-export default function UserManagementPage() {
-  const [users, setUsers] = useState<User[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
+export default function InstitutionManagerUserManagement() {
+  const currentInstitution = "Boys Town" // This would come from user context
+  const [users, setUsers] = useState(mockUsers)
+  const [filteredUsers, setFilteredUsers] = useState(mockUsers)
   const [searchQuery, setSearchQuery] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [newRole, setNewRole] = useState<UserRole>("instructor")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [updating, setUpdating] = useState(false)
-  const [currentUserInstitution, setCurrentUserInstitution] = useState<string>("")
-
-  useEffect(() => {
-    fetchUsers()
-  }, [])
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [newRole, setNewRole] = useState("instructor")
 
   useEffect(() => {
     if (searchQuery) {
@@ -105,64 +149,8 @@ export default function UserManagementPage() {
     }
   }, [searchQuery, users])
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch("/api/users")
-      if (response.ok) {
-        const data = await response.json()
-        setUsers(data)
-        setFilteredUsers(data)
-        // Get current user's institution from the first user in the list
-        if (data.length > 0) {
-          setCurrentUserInstitution(data[0].institution)
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch users:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleRoleChange = (user: User) => {
-    setSelectedUser(user)
-    setNewRole(user.role as UserRole)
-    setIsDialogOpen(true)
-  }
-
-  const handleUpdateRole = async () => {
-    if (!selectedUser) return
-
-    setUpdating(true)
-    try {
-      const response = await fetch("/api/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: selectedUser.id,
-          role: newRole,
-        }),
-      })
-
-      if (response.ok) {
-        await fetchUsers()
-        setIsDialogOpen(false)
-        setSelectedUser(null)
-      } else {
-        const error = await response.json()
-        alert(`Failed to update role: ${error.error}`)
-      }
-    } catch (error) {
-      console.error("Failed to update role:", error)
-      alert("Failed to update role")
-    } finally {
-      setUpdating(false)
-    }
-  }
-
   const getRoleStats = () => {
-    const stats: Record<string, number> = {}
+    const stats = {}
     users.forEach((user) => {
       stats[user.role] = (stats[user.role] || 0) + 1
     })
@@ -171,188 +159,172 @@ export default function UserManagementPage() {
 
   const roleStats = getRoleStats()
 
+  const handleRoleChange = (user) => {
+    setSelectedUser(user)
+    setNewRole(user.role)
+    setIsModalOpen(true)
+  }
+
+  const handleUpdateRole = () => {
+    setUsers(users.map(u => 
+      u.id === selectedUser.id ? { ...u, role: newRole } : u
+    ))
+    setIsModalOpen(false)
+    setSelectedUser(null)
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Users className="w-8 h-8 text-cyan-600" />
-            <h1 className="text-4xl font-bold text-slate-900">User Management</h1>
+            <Users />
+            <h1 className="text-4xl font-bold text-gray-900">User Management</h1>
           </div>
-          <p className="text-slate-600">Manage user roles and permissions for your institution</p>
-          {currentUserInstitution && (
-            <div className="flex items-center gap-2 mt-2">
-              <Building2 className="w-4 h-4 text-slate-500" />
-              <span className="text-sm text-slate-600">
-                Managing users from: <Badge className={INSTITUTION_COLORS[currentUserInstitution]}>{currentUserInstitution}</Badge>
-              </span>
-            </div>
-          )}
+          <p className="text-gray-600">Manage user roles and permissions for your institution</p>
+          <div className="flex items-center gap-2 mt-2">
+            <Building2 />
+            <span className="text-sm text-gray-600">
+              Managing users from: <Badge className="bg-blue-100 text-blue-800">{currentInstitution}</Badge>
+            </span>
+          </div>
         </div>
 
         {/* Institution Notice */}
-        <Card className="mb-6 bg-blue-50 border-blue-200">
-          <CardContent className="pt-6">
-            <div className="flex gap-3">
-              <Building2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-semibold text-blue-900 mb-2">Institution-Based Access</h4>
-                <p className="text-sm text-blue-800">
-                  You can only view and manage users from <strong>{currentUserInstitution}</strong>. Users can only access 
-                  submissions and data from their assigned institution.
-                </p>
-              </div>
+        <Alert className="mb-6 bg-blue-50 border-blue-200">
+          <div className="flex gap-3">
+            <Building2 />
+            <div>
+              <h4 className="font-semibold text-blue-900 mb-2">Institution-Based Access</h4>
+              <p className="text-sm text-blue-800">
+                You can only view and manage users from <strong>{currentInstitution}</strong>. Users can only access 
+                submissions and data from their assigned institution.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Alert>
 
         {/* Role Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
           {Object.entries(ROLE_INFO).map(([role, info]) => (
-            <Card key={role} className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-medium text-slate-600">{info.label}</CardTitle>
+            <Card key={role}>
+              <CardHeader>
+                <h4 className="text-xs font-medium text-gray-600">{info.label}</h4>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-slate-900">{roleStats[role] || 0}</div>
+                <div className="text-2xl font-bold text-gray-900">{roleStats[role] || 0}</div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* Search and Filter */}
+        {/* Search */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Institution Users</span>
-              <Button variant="outline" size="sm" onClick={fetchUsers} disabled={loading}>
-                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-                Refresh
-              </Button>
-            </CardTitle>
-            <CardDescription>
-              {filteredUsers.length} user{filteredUsers.length !== 1 ? "s" : ""} from {currentUserInstitution}
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <CardTitle>Institution Users</CardTitle>
+              <span className="text-sm text-gray-600">{filteredUsers.length} users</span>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="mb-4">
               <Label htmlFor="search">Search Users</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                <Input
-                  id="search"
-                  placeholder="Search by name, email, or role..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              <Input
+                id="search"
+                placeholder="Search by name, email, or role..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
 
-            {loading ? (
-              <div className="py-12 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="py-12 text-center text-slate-600">No users found</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50">
-                    <tr className="border-b">
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Name</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Email</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Institution</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Role</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Secondary Approval</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUsers.map((user) => {
-                      const roleInfo = ROLE_INFO[user.role as UserRole]
-                      const canApprovePC = ["senior_instructor", "im", "admin"].includes(user.role)
-                      const canApproveAMO = ["im", "admin"].includes(user.role)
+            {/* Users Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr className="border-b">
+                    <th className="px-4 py-3 text-left font-semibold">Name</th>
+                    <th className="px-4 py-3 text-left font-semibold">Email</th>
+                    <th className="px-4 py-3 text-left font-semibold">Role</th>
+                    <th className="px-4 py-3 text-left font-semibold">Secondary Approval</th>
+                    <th className="px-4 py-3 text-left font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user) => {
+                    const roleInfo = ROLE_INFO[user.role]
+                    const canApprovePC = ["senior_instructor", "institution_manager"].includes(user.role)
+                    const canApproveAMO = user.role === "institution_manager"
 
-                      return (
-                        <tr key={user.id} className="border-b hover:bg-slate-50">
-                          <td className="px-4 py-3 font-medium text-slate-900">{user.full_name}</td>
-                          <td className="px-4 py-3 text-slate-600">{user.email}</td>
-                          <td className="px-4 py-3">
-                            <Badge className={INSTITUTION_COLORS[user.institution] || "bg-gray-100 text-gray-800"}>
-                              {user.institution}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge className={roleInfo?.color || "bg-gray-100 text-gray-800"}>
-                              {roleInfo?.label || user.role}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            {canApprovePC || canApproveAMO ? (
-                              <div className="flex gap-1">
-                                {canApprovePC && (
-                                  <Badge variant="outline" className="text-xs">
-                                    PC
-                                  </Badge>
-                                )}
-                                {canApproveAMO && (
-                                  <Badge variant="outline" className="text-xs">
-                                    AMO
-                                  </Badge>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 text-xs">None</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRoleChange(user)}
-                              className="gap-2"
-                            >
-                              {user.role === "senior_instructor" && <Award className="w-3 h-3" />}
-                              Change Role
-                            </Button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    return (
+                      <tr key={user.id} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900">{user.full_name}</td>
+                        <td className="px-4 py-3 text-gray-600">{user.email}</td>
+                        <td className="px-4 py-3">
+                          <Badge className={roleInfo?.color || "bg-gray-100 text-gray-800"}>
+                            {roleInfo?.label || user.role}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          {canApprovePC || canApproveAMO ? (
+                            <div className="flex gap-1">
+                              {canApprovePC && (
+                                <Badge variant="outline" className="text-xs">
+                                  PC
+                                </Badge>
+                              )}
+                              {canApproveAMO && (
+                                <Badge variant="outline" className="text-xs">
+                                  AMO
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs">None</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRoleChange(user)}
+                          >
+                            {user.role === "senior_instructor" && <Award />}
+                            Change Role
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Role Change Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Change User Role</DialogTitle>
-              <DialogDescription>
-                Update the role for {selectedUser?.full_name} ({selectedUser?.email})
-              </DialogDescription>
-            </DialogHeader>
+        {/* Role Change Modal */}
+        {isModalOpen && selectedUser && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-xl font-bold mb-4">Change User Role</h3>
+              <p className="text-gray-600 mb-4">
+                Update the role for {selectedUser.full_name} ({selectedUser.email})
+              </p>
 
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <Alert className="mb-4 bg-blue-50 border-blue-200">
                 <div className="flex items-center gap-2 text-sm text-blue-800">
-                  <Building2 className="w-4 h-4" />
-                  <span>Institution: <strong>{selectedUser?.institution}</strong></span>
+                  <Building2 />
+                  <span>Institution: <strong>{selectedUser.institution}</strong></span>
                 </div>
-              </div>
+              </Alert>
 
-              <div>
+              <div className="mb-6">
                 <Label htmlFor="role">Select New Role</Label>
                 <select
                   id="role"
                   value={newRole}
-                  onChange={(e) => setNewRole(e.target.value as UserRole)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md mt-2"
+                  onChange={(e) => setNewRole(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
                   {Object.entries(ROLE_INFO).map(([role, info]) => (
                     <option key={role} value={role}>
@@ -363,48 +335,46 @@ export default function UserManagementPage() {
               </div>
 
               {newRole === "senior_instructor" && (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                <Alert className="mb-4 bg-purple-50 border-purple-200">
                   <div className="flex gap-2">
-                    <Award className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                    <Award />
                     <div className="text-sm text-purple-800">
                       <p className="font-semibold mb-1">Senior Instructor</p>
                       <p>This user will be able to provide secondary approval for PC reviews when the primary PC reviewer is unavailable.</p>
                     </div>
                   </div>
-                </div>
+                </Alert>
               )}
 
-              {["im", "admin"].includes(newRole) && (
-                <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-3">
+              {newRole === "institution_manager" && (
+                <Alert className="mb-4 bg-cyan-50 border-cyan-200">
                   <div className="flex gap-2">
-                    <Shield className="w-5 h-5 text-cyan-600 flex-shrink-0" />
+                    <Shield />
                     <div className="text-sm text-cyan-800">
                       <p className="font-semibold mb-1">Full Secondary Approval Authority</p>
-                      <p>This user will be able to provide secondary approval for both PC and AMO reviews, and manage users from {selectedUser?.institution}.</p>
+                      <p>This user will be able to provide secondary approval for both PC and AMO reviews, and manage users from {selectedUser.institution}.</p>
                     </div>
                   </div>
-                </div>
+                </Alert>
               )}
-            </div>
 
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-                disabled={updating}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleUpdateRole}
-                disabled={updating || newRole === selectedUser?.role}
-                className="bg-cyan-500 hover:bg-cyan-600"
-              >
-                {updating ? "Updating..." : "Update Role"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateRole}
+                  disabled={newRole === selectedUser.role}
+                >
+                  Update Role
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
