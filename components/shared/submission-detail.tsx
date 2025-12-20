@@ -34,7 +34,7 @@ interface Submission {
 interface SubmissionDetailProps {
   submission: Submission
   onBack: () => void
-  reviewerRole?: "pc" | "amo" | "im" | "admin"
+  reviewerRole?: "pc" | "amo" | "institution_manager" | "head_of_programs"
   viewOnly?: boolean
 }
 
@@ -132,7 +132,7 @@ export default function SubmissionDetail({
   }, [submission.id, submission.submission_documents])
 
   // Determine if user can review
-  const isSecondaryApprover = ["im", "admin", "senior_instructor"].includes(userRole)
+  const isSecondaryApprover = ["institution_manager", "head_of_programs", "senior_instructor"].includes(userRole)
   const isPrimaryReviewer = reviewerRole && userRole === reviewerRole
   const canReview = (isPrimaryReviewer || isSecondaryApprover) && !viewOnly
 
@@ -149,8 +149,8 @@ export default function SubmissionDetail({
       canProvideSecondaryApproval = true
       reviewStage = "pc"
     }
-    // IM and Admin can approve both stages
-    else if (["im", "admin"].includes(userRole)) {
+    // Institution Manager and Head of Programs can approve both stages
+    else if (["institution_manager", "head_of_programs"].includes(userRole)) {
       if (submission.status === "submitted") {
         canProvideSecondaryApproval = true
         reviewStage = "pc"
@@ -250,15 +250,15 @@ export default function SubmissionDetail({
         </div>
       )}
 
-      {/* IM/Admin Secondary Approval Alert */}
-      {["im", "admin"].includes(userRole) && canProvideSecondaryApproval && !isPrimaryReviewer && !viewOnly && (
+      {/* Institution Manager/Head of Programs Secondary Approval Alert */}
+      {["institution_manager", "head_of_programs"].includes(userRole) && canProvideSecondaryApproval && !isPrimaryReviewer && !viewOnly && (
         <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4">
           <div className="flex gap-3">
             <AlertCircle className="w-5 h-5 text-cyan-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-cyan-900">Secondary Approval Authority</p>
               <p className="text-sm text-cyan-800 mt-1">
-                You are authorized to approve or reject this submission as a secondary approver ({userRole.toUpperCase()}) for the {reviewStage.toUpperCase()} stage.
+                You are authorized to approve or reject this submission as a secondary approver ({userRole === "institution_manager" ? "Institution Manager" : "Head of Programs"}) for the {reviewStage.toUpperCase()} stage.
                 Your decision will be recorded in the audit trail as a secondary review.
               </p>
             </div>
@@ -282,7 +282,7 @@ export default function SubmissionDetail({
                   </span>
                   {canProvideSecondaryApproval && reviewType === "secondary" && (
                     <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded text-center">
-                      {userRole === "senior_instructor" ? "Senior Instructor" : "Secondary Review"}
+                      {userRole === "senior_instructor" ? "Senior Instructor" : userRole === "institution_manager" ? "Institution Manager" : "Head of Programs"}
                     </span>
                   )}
                 </div>
@@ -358,7 +358,7 @@ export default function SubmissionDetail({
                 </CardTitle>
                 {reviewType === "secondary" && (
                   <CardDescription className={userRole === "senior_instructor" ? "text-purple-600 font-medium" : "text-cyan-600 font-medium"}>
-                    {userRole === "senior_instructor" ? "Senior Instructor" : "Secondary Approver"} ({reviewStage.toUpperCase()})
+                    {userRole === "senior_instructor" ? "Senior Instructor" : userRole === "institution_manager" ? "Institution Manager" : "Head of Programs"} ({reviewStage.toUpperCase()})
                   </CardDescription>
                 )}
               </CardHeader>

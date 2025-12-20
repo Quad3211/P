@@ -6,16 +6,16 @@ import { useState } from "react"
 import Link from "next/link"
 import NotificationsSidebar from "@/components/shared/notifications-sidebar"
 
-type UserRole = "instructor" | "pc" | "amo" | "im" | "registration" | "records" | "admin" | "senior_instructor"
+type UserRole = "instructor" | "pc" | "amo" | "institution_manager" | "registration" | "records" | "head_of_programs" | "senior_instructor"
 
 const ROLE_LABELS: Record<UserRole, string> = {
   instructor: "Instructor",
   pc: "PC - Programme Coordinator",
   amo: "AMO - Academic Management",
-  im: "IM - Information Management",
+  institution_manager: "IM - Institution Manager",
   registration: "Registration",
   records: "Records Manager",
-  admin: "Administrator",
+  head_of_programs: "Head of Programs",
   senior_instructor: "Senior Instructor",
 }
 

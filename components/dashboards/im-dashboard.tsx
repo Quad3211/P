@@ -23,11 +23,11 @@ interface Submission {
   description?: string
 }
 
-interface IMDashboardProps {
+interface InstitutionManagerDashboardProps {
   userName: string
 }
 
-export default function IMDashboard({ userName }: IMDashboardProps) {
+export default function InstitutionManagerDashboard({ userName }: InstitutionManagerDashboardProps) {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
@@ -91,7 +91,7 @@ export default function IMDashboard({ userName }: IMDashboardProps) {
         <SubmissionDetail 
           submission={selectedSubmission} 
           onBack={() => setSelectedSubmission(null)} 
-          reviewerRole="im"
+          reviewerRole="institution_manager"
         />
       </div>
     )
@@ -101,7 +101,7 @@ export default function IMDashboard({ userName }: IMDashboardProps) {
     <div className="min-h-screen bg-slate-50">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">IM Dashboard</h1>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Institution Manager Dashboard</h1>
           <p className="text-slate-600">Institution Manager & Secondary Approval Authority</p>
         </div>
 
@@ -175,7 +175,7 @@ export default function IMDashboard({ userName }: IMDashboardProps) {
               <div>
                 <p className="font-semibold text-cyan-900">Secondary Approval Authority</p>
                 <p className="text-sm text-cyan-800 mt-1">
-                  As IM, you have the authority to approve or reject submissions when the AMO is unavailable. 
+                  As Institution Manager, you have the authority to approve or reject submissions when the AMO is unavailable. 
                   Your review will be logged as a secondary approval in the audit trail.
                 </p>
               </div>

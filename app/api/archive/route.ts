@@ -12,10 +12,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is records manager
+    // Check if user is records manager or head of programs
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
-    if (profile?.role !== "records" && profile?.role !== "admin") {
+    if (profile?.role !== "records" && profile?.role !== "head_of_programs") {
       return NextResponse.json({ error: "Unauthorized to archive" }, { status: 403 })
     }
 

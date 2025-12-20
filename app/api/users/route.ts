@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
       .eq("id", user.id)
       .single()
 
-    if (!profile || !["admin", "im"].includes(profile.role)) {
+    if (!profile || !["head_of_programs", "institution_manager"].includes(profile.role)) {
       return NextResponse.json(
-        { error: "Only IM and Admin users can view all users" },
+        { error: "Only Institution Manager and Head of Programs users can view all users" },
         { status: 403 }
       )
     }
@@ -61,16 +61,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is IM or admin
+    // Check if user is Institution Manager or Head of Programs
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
 
-    if (!profile || !["admin", "im"].includes(profile.role)) {
+    if (!profile || !["head_of_programs", "institution_manager"].includes(profile.role)) {
       return NextResponse.json(
-        { error: "Only IM and Admin users can change roles" },
+        { error: "Only Institution Manager and Head of Programs users can change roles" },
         { status: 403 }
       )
     }
@@ -91,10 +91,10 @@ export async function PATCH(request: NextRequest) {
       "senior_instructor",
       "pc",
       "amo",
-      "im",
+      "institution_manager",
       "registration",
       "records",
-      "admin",
+      "head_of_programs",
     ]
 
     if (!validRoles.includes(role)) {

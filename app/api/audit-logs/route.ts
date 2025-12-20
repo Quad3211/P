@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
-    if (profile?.role !== "admin" && profile?.role !== "records") {
+    if (profile?.role !== "head_of_programs" && profile?.role !== "records" && profile?.role !== "institution_manager") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 

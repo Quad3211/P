@@ -38,8 +38,8 @@ export default function SettingsPage() {
       if (data) {
         setProfile(data)
 
-        // Only admins and records managers can access settings
-        if (!["admin", "records"].includes(data.role)) {
+        // Only Head of Programs, records managers, and institution managers can access settings
+        if (!["head_of_programs", "records", "institution_manager"].includes(data.role)) {
           router.push("/dashboard")
           return
         }
