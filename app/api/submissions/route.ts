@@ -2,9 +2,9 @@ import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-
   try {
+    const supabase = await createClient()
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     if (profileError) {
       console.error("Profile fetch error:", profileError)
-      return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 })
+      return NextResponse.json({ error: "Failed to fetch profile", details: profileError.message }, { status: 500 })
     }
 
     if (!profile) {
@@ -60,20 +60,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data || [])
   } catch (error) {
     console.error("GET /api/submissions error:", error)
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch submissions" },
+      { 
+        error: error instanceof Error ? error.message : "Failed to fetch submissions",
+        details: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     )
   }
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-
   try {
+    const supabase = await createClient()
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
+    
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -91,7 +96,7 @@ export async function POST(request: NextRequest) {
     if (profileError || !profile) {
       console.error("Profile fetch error:", profileError)
       return NextResponse.json(
-        { error: "User profile not found. Please contact administrator." },
+        { error: "User profile not found. Please contact administrator.", details: profileError?.message },
         { status: 400 }
       )
     }
@@ -135,7 +140,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("POST /api/submissions error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create submission" },
+      { error: error instanceof Error ? error.message : "Failed to create submission", details: error?.details },
       { status: 500 },
     )
   }

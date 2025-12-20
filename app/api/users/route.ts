@@ -2,9 +2,9 @@ import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-
   try {
+    const supabase = await createClient()
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -14,13 +14,25 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user has permission to view all users
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
 
-    if (!profile || !["head_of_programs", "institution_manager"].includes(profile.role)) {
+    if (profileError) {
+      console.error("Profile fetch error:", profileError)
+      return NextResponse.json(
+        { error: "Failed to fetch profile", details: profileError.message },
+        { status: 500 }
+      )
+    }
+
+    if (!profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 })
+    }
+
+    if (!["head_of_programs", "institution_manager"].includes(profile.role)) {
       return NextResponse.json(
         { error: "Only Institution Manager and Head of Programs users can view all users" },
         { status: 403 }
@@ -30,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Fetch all users - fixed query
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, email, full_name, role, created_at")
+      .select("id, email, full_name, role, institution, approval_status, created_at")
       .order("full_name", { ascending: true })
 
     if (error) {
@@ -43,16 +55,19 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error fetching users:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch users" },
+      { 
+        error: error instanceof Error ? error.message : "Failed to fetch users",
+        details: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     )
   }
 }
 
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient()
-
   try {
+    const supabase = await createClient()
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -62,13 +77,25 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Check if user is Institution Manager or Head of Programs
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
 
-    if (!profile || !["head_of_programs", "institution_manager"].includes(profile.role)) {
+    if (profileError) {
+      console.error("Profile fetch error:", profileError)
+      return NextResponse.json(
+        { error: "Failed to fetch profile", details: profileError.message },
+        { status: 500 }
+      )
+    }
+
+    if (!profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 })
+    }
+
+    if (!["head_of_programs", "institution_manager"].includes(profile.role)) {
       return NextResponse.json(
         { error: "Only Institution Manager and Head of Programs users can change roles" },
         { status: 403 }
@@ -102,11 +129,19 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Get target user info before update
-    const { data: targetUser } = await supabase
+    const { data: targetUser, error: targetError } = await supabase
       .from("profiles")
       .select("full_name, email, role")
       .eq("id", userId)
       .single()
+
+    if (targetError) {
+      console.error("Target user fetch error:", targetError)
+      return NextResponse.json(
+        { error: "Target user not found", details: targetError.message },
+        { status: 404 }
+      )
+    }
 
     if (!targetUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
@@ -119,9 +154,12 @@ export async function PATCH(request: NextRequest) {
       .eq("id", userId)
       .select()
 
-    if (error) throw error
+    if (error) {
+      console.error("Role update error:", error)
+      throw error
+    }
 
-    // Create audit log entry (will be handled by trigger, but we can add manual entry too)
+    // Create audit log entry
     await supabase.from("audit_logs").insert({
       user_id: user.id,
       action: `Changed ${targetUser.full_name}'s role from ${targetUser.role} to ${role}`,
@@ -144,7 +182,10 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error("Role update error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update role" },
+      { 
+        error: error instanceof Error ? error.message : "Failed to update role",
+        details: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     )
   }

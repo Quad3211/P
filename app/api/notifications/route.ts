@@ -1,13 +1,42 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function GET(request: NextRequest) {
-  const supabase = await createClient()
+// Define types for better type safety
+interface Review {
+  id: string
+  submission_id: string
+  reviewer_role: string
+  created_at: string
+}
 
+interface ReviewSubmission {
+  id: string
+  submission_id: string
+  title: string
+}
+
+interface ReviewWithSubmission extends Review {
+  submission: ReviewSubmission | null
+}
+
+interface Submission {
+  id: string
+  submission_id: string
+  title: string
+  status: string
+  updated_at: string
+  instructor_name: string
+  created_at: string
+}
+
+export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient()
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
+    
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -19,8 +48,12 @@ export async function GET(request: NextRequest) {
       .eq("id", user.id)
       .single()
 
-    if (profileError || !profile) {
+    if (profileError) {
       console.error("Profile fetch error:", profileError)
+      return NextResponse.json({ error: "Profile not found", details: profileError.message }, { status: 404 })
+    }
+
+    if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
 
@@ -58,7 +91,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get submission details for reviews
-    let reviewsWithSubmissions = []
+    const reviewsWithSubmissions: ReviewWithSubmission[] = []
     if (reviews && reviews.length > 0) {
       const submissionIds = reviews.map(r => r.submission_id)
       const { data: reviewSubmissions } = await supabase
@@ -66,12 +99,12 @@ export async function GET(request: NextRequest) {
         .select("id, submission_id, title")
         .in("id", submissionIds)
 
-      reviewsWithSubmissions = reviews.map(review => {
+      reviews.forEach(review => {
         const submission = reviewSubmissions?.find(s => s.id === review.submission_id)
-        return {
+        reviewsWithSubmissions.push({
           ...review,
           submission: submission || null
-        }
+        })
       })
     }
 
@@ -84,18 +117,18 @@ export async function GET(request: NextRequest) {
       .limit(50)
 
     // Filter role changes for current user
-    const userRoleChanges = roleChanges?.filter(rc => {
+    const userRoleChanges = (roleChanges || []).filter(rc => {
       try {
         const details = typeof rc.details === 'string' ? JSON.parse(rc.details) : rc.details
         return details?.target_user_id === user.id
       } catch {
         return false
       }
-    }).slice(0, 5) || []
+    }).slice(0, 5)
 
     const notifications = [
       // Submission status updates
-      ...((submissions || []).filter(s => 
+      ...((submissions || []) as Submission[]).filter(s => 
         s.status !== 'draft' && 
         new Date(s.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       ).map((s) => ({
@@ -106,10 +139,10 @@ export async function GET(request: NextRequest) {
         timestamp: s.updated_at,
         read: false,
         submission_id: s.submission_id,
-      }))),
+      })),
       
       // Pending reviews
-      ...(reviewsWithSubmissions.map((r) => ({
+      ...reviewsWithSubmissions.map((r) => ({
         id: `rev-${r.id}`,
         type: "review" as const,
         title: `Review Required`,
@@ -117,17 +150,17 @@ export async function GET(request: NextRequest) {
         timestamp: r.created_at,
         read: false,
         submission_id: r.submission?.submission_id,
-      }))),
+      })),
       
       // Role change notifications
-      ...(userRoleChanges.map((rc) => ({
+      ...userRoleChanges.map((rc) => ({
         id: `role-${rc.id}`,
         type: "role_change" as const,
         title: `Your Role Has Been Updated`,
         message: rc.action,
         timestamp: rc.created_at,
         read: false,
-      }))),
+      })),
     ]
 
     // Sort by timestamp and limit to 20
@@ -137,7 +170,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Notifications error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch notifications" },
+      { error: error instanceof Error ? error.message : "Failed to fetch notifications", details: error instanceof Error ? error.stack : undefined },
       { status: 500 },
     )
   }

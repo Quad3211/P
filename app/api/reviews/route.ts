@@ -1,11 +1,10 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
-
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-
   try {
+    const supabase = await createClient()
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -18,11 +17,23 @@ export async function POST(request: NextRequest) {
     const { submission_id, reviewer_role, status, comments } = body
 
     // Get reviewer profile
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
+
+    if (profileError) {
+      console.error("Profile fetch error:", profileError)
+      return NextResponse.json(
+        { error: "Failed to fetch profile", details: profileError.message },
+        { status: 500 }
+      )
+    }
+
+    if (!profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 })
+    }
 
     if (profile?.role !== reviewer_role && profile?.role !== "admin") {
       return NextResponse.json(
@@ -32,11 +43,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch submission (FULL DATA — needed for email)
-    const { data: submission } = await supabase
+    const { data: submission, error: submissionError } = await supabase
       .from("submissions")
       .select("id, status, title, instructor_email, instructor_name")
       .eq("id", submission_id)
       .single()
+
+    if (submissionError) {
+      console.error("Submission fetch error:", submissionError)
+      return NextResponse.json(
+        { error: "Submission not found", details: submissionError.message },
+        { status: 404 }
+      )
+    }
 
     if (!submission) {
       return NextResponse.json({ error: "Submission not found" }, { status: 404 })
@@ -67,7 +86,10 @@ export async function POST(request: NextRequest) {
       })
       .select()
 
-    if (reviewError) throw reviewError
+    if (reviewError) {
+      console.error("Review upsert error:", reviewError)
+      throw reviewError
+    }
 
     // Map workflow status
     let newStatus: string | null = null
@@ -90,7 +112,10 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", submission_id)
 
-      if (updateError) throw updateError
+      if (updateError) {
+        console.error("Submission update error:", updateError)
+        throw updateError
+      }
     }
 
     return NextResponse.json(reviewData[0], { status: 201 })
@@ -103,6 +128,7 @@ export async function POST(request: NextRequest) {
           error instanceof Error
             ? error.message
             : "Failed to create review",
+        details: error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     )
@@ -110,9 +136,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-
   try {
+    const supabase = await createClient()
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -134,13 +160,20 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
 
-    if (error) throw error
+    if (error) {
+      console.error("Reviews fetch error:", error)
+      throw error
+    }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data || [])
   } catch (error) {
+    console.error("GET Reviews error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch reviews" },
-      { status: 500 },
+      { 
+        error: error instanceof Error ? error.message : "Failed to fetch reviews",
+        details: error instanceof Error ? error.stack : undefined
+      },
+      { status: 500 }
     )
   }
 }

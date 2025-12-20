@@ -10,15 +10,31 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }))
-      console.error(`API Error [${endpoint}]:`, error)
+      // Try to parse error response
+      let error: any
+      try {
+        error = await response.json()
+      } catch {
+        error = { 
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          status: response.status,
+          statusText: response.statusText
+        }
+      }
+      
+      console.error(`API Error [${endpoint}]:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error
+      })
+      
       throw new Error(error.error || error.message || `API error: ${response.status}`)
     }
 
     const data = await response.json()
     return data
   } catch (error) {
-    console.error(`Network Error [${endpoint}]:`, error)
+    console.error(`Network/API Error [${endpoint}]:`, error)
     throw error
   }
 }

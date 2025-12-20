@@ -21,7 +21,6 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   const generateEmail = (user: string) => {
     return `${user.trim().toLowerCase()}@heart-nsta.org`
@@ -33,6 +32,14 @@ export default function SignupPage() {
     setError(null)
 
     try {
+      const supabase = createClient()
+
+      if (!supabase) {
+        setError("Authentication service is not available. Please contact administrator.")
+        setLoading(false)
+        return
+      }
+
       const email = generateEmail(username)
 
       const { error: signUpError } = await supabase.auth.signUp({
@@ -49,12 +56,14 @@ export default function SignupPage() {
       })
 
       if (signUpError) {
+        console.error("Signup error:", signUpError)
         setError(signUpError.message)
       } else {
         setSuccess(true)
       }
     } catch (err) {
-      setError("An unexpected error occurred")
+      console.error("Unexpected signup error:", err)
+      setError(err instanceof Error ? err.message : "An unexpected error occurred")
     } finally {
       setLoading(false)
     }
@@ -118,6 +127,7 @@ export default function SignupPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
 
@@ -130,6 +140,7 @@ export default function SignupPage() {
               onChange={(e) => setInstitution(e.target.value as Institution)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
               required
+              disabled={loading}
             >
               <option value="Boys Town">Boys Town</option>
               <option value="Stony Hill">Stony Hill</option>
@@ -149,6 +160,7 @@ export default function SignupPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
+                disabled={loading}
                 className="border-none focus:ring-0 flex-1"
               />
               <span className="px-3 text-gray-500 font-medium bg-gray-50">@heart-nsta.org</span>
@@ -163,6 +175,7 @@ export default function SignupPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={loading}
               minLength={6}
             />
             <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
@@ -180,7 +193,14 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full bg-cyan-500 hover:bg-cyan-600 text-white py-2 rounded-lg font-medium"
           >
-            {loading ? "Creating account..." : "Create Account"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                Creating account...
+              </span>
+            ) : (
+              "Create Account"
+            )}
           </Button>
         </form>
 
