@@ -43,7 +43,7 @@ export default function SignupPage() {
           data: {
             full_name: fullName,
             institution: institution,
-            // Role will be set to 'instructor' by the database trigger
+            role: 'instructor',
           },
         },
       })
@@ -67,32 +67,27 @@ export default function SignupPage() {
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-10 h-10 text-green-600" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Registration Submitted!</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Account Created!</h2>
           <div className="space-y-4 text-left mb-6">
             <p className="text-gray-600">
-              Your account has been created and is now pending approval from the <strong>Head of Programs</strong>.
+              Your account has been successfully created. You can now sign in and start using the submission portal.
             </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-900">
-                <strong>What happens next?</strong>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-sm text-green-900">
+                <strong>What's next?</strong>
               </p>
-              <ul className="text-sm text-blue-800 mt-2 space-y-1 list-disc list-inside">
-                <li>The Head of Programs will review your registration</li>
-                <li>You'll receive an email once your account is approved</li>
-                <li>After approval, you can sign in and start submitting</li>
+              <ul className="text-sm text-green-800 mt-2 space-y-1 list-disc list-inside">
+                <li>Sign in with your credentials</li>
+                <li>Complete your profile if needed</li>
+                <li>Start creating submissions</li>
               </ul>
-            </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <p className="text-sm text-amber-900">
-                <strong>Important:</strong> You cannot sign in until your account is approved.
-              </p>
             </div>
           </div>
           <Link
             href="/auth/login"
             className="inline-block px-6 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-medium"
           >
-            Back to Sign In
+            Sign In Now
           </Link>
         </div>
       </div>
@@ -109,17 +104,10 @@ export default function SignupPage() {
           <h2 className="text-2xl font-bold text-gray-900">Submission</h2>
         </div>
 
-        <h3 className="text-3xl font-bold text-gray-900 mb-2">Instructor Registration</h3>
+        <h3 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h3>
         <p className="text-gray-600 mb-6">
-          Create your instructor account. Your registration will be reviewed by the Head of Programs.
+          Sign up as an instructor to start submitting documents.
         </p>
-
-        <Alert className="mb-6 bg-blue-50 border-blue-200">
-          <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-900">
-            All new accounts are created as <strong>Instructor</strong> and require approval before you can sign in.
-          </AlertDescription>
-        </Alert>
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div>
@@ -187,19 +175,12 @@ export default function SignupPage() {
             </Alert>
           )}
 
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <p className="text-sm text-amber-900">
-              <strong>Important:</strong> After registration, you must wait for approval from the{" "}
-              <strong>Head of Programs</strong> before you can sign in.
-            </p>
-          </div>
-
           <Button
             type="submit"
             disabled={loading}
             className="w-full bg-cyan-500 hover:bg-cyan-600 text-white py-2 rounded-lg font-medium"
           >
-            {loading ? "Creating account..." : "Create Instructor Account"}
+            {loading ? "Creating account..." : "Create Account"}
           </Button>
         </form>
 

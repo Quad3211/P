@@ -14,7 +14,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [approvalError, setApprovalError] = useState(false);
   const router = useRouter();
 
   const generateEmail = (user: string) => {
@@ -25,7 +24,6 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setApprovalError(false);
 
     try {
       const supabase = createClient();
@@ -60,56 +58,8 @@ export default function LoginPage() {
         return;
       }
 
-      // User authenticated successfully, now check approval status
+      // User authenticated successfully - redirect directly to dashboard
       if (data.user) {
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("approval_status, rejected_reason, role, full_name")
-          .eq("id", data.user.id)
-          .single();
-
-        if (profileError) {
-          console.error("Profile fetch error:", profileError);
-          setError("Failed to verify account status. Please contact support.");
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
-
-        // Check approval status
-        if (profile.approval_status === "pending") {
-          setApprovalError(true);
-          setError(
-            "Your account is pending approval from the Head of Programs. You cannot sign in until your account has been approved."
-          );
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
-
-        if (profile.approval_status === "rejected") {
-          setApprovalError(true);
-          const reason = profile.rejected_reason
-            ? `Reason: ${profile.rejected_reason}`
-            : "Please contact the Head of Programs for more information.";
-          setError(`Your account registration was rejected. ${reason}`);
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
-
-        // Check if approval_status is explicitly "approved"
-        if (profile.approval_status !== "approved") {
-          setApprovalError(true);
-          setError(
-            "Your account status is uncertain. Please contact the Head of Programs for assistance."
-          );
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
-
-        // All checks passed - successful login
         router.push("/dashboard");
       } else {
         setError("Authentication failed. Please try again.");
@@ -188,35 +138,10 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <Alert
-                className={
-                  approvalError
-                    ? "bg-amber-50 border-amber-200 text-amber-900"
-                    : "bg-red-50 border-red-200 text-red-900"
-                }
-              >
+              <Alert className="bg-red-50 border-red-200 text-red-900">
                 <div className="flex items-start gap-2">
-                  <span className="text-xl">{approvalError ? "⚠️" : "❌"}</span>
-                  <div className="flex-1">
-                    <p>{error}</p>
-                    {approvalError && (
-                      <div className="mt-3 text-xs">
-                        <strong>Next steps:</strong>
-                        <ul className="list-disc list-inside mt-1 space-y-1">
-                          <li>
-                            Wait for the Head of Programs to review your
-                            registration
-                          </li>
-                          <li>
-                            You'll receive an email notification when approved
-                          </li>
-                          <li>
-                            Check your spam folder if you don't see the email
-                          </li>
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+                  <span className="text-xl">❌</span>
+                  <p>{error}</p>
                 </div>
               </Alert>
             )}
@@ -248,14 +173,6 @@ export default function LoginPage() {
               </Link>
             </p>
           </div>
-
-          {/* Info box about approval */}
-          <Alert className="mt-4 bg-blue-50 border-blue-200">
-            <div className="text-sm text-blue-900">
-              <strong>Note:</strong> New instructor accounts require Head of
-              Programs approval.
-            </div>
-          </Alert>
         </div>
       </div>
     </div>
