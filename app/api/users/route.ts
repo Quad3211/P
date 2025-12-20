@@ -1,3 +1,6 @@
+// app/api/users/route.ts
+// Updated version with better error handling and logging
+
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
@@ -10,53 +13,85 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
     
     if (!user) {
+      console.error("[users/GET] No authenticated user")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user has permission to view all users
+    console.log("[users/GET] Authenticated user ID:", user.id)
+
+    // Get current user's profile with detailed logging
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, institution, full_name")
       .eq("id", user.id)
       .single()
 
+    console.log("[users/GET] Current user profile:", profile)
+    
     if (profileError) {
-      console.error("Profile fetch error:", profileError)
+      console.error("[users/GET] Profile fetch error:", profileError)
       return NextResponse.json(
-        { error: "Failed to fetch profile", details: profileError.message },
+        { 
+          error: "Failed to fetch profile", 
+          details: profileError.message,
+          code: profileError.code 
+        },
         { status: 500 }
       )
     }
 
     if (!profile) {
+      console.error("[users/GET] Profile not found for user:", user.id)
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
 
     if (!["head_of_programs", "institution_manager"].includes(profile.role)) {
+      console.log("[users/GET] Insufficient permissions. Role:", profile.role)
       return NextResponse.json(
-        { error: "Only Institution Manager and Head of Programs users can view all users" },
+        { error: `Only Institution Manager and Head of Programs users can view all users. Your role: ${profile.role}` },
         { status: 403 }
       )
     }
 
-    // Fetch all users - fixed query
-    const { data, error } = await supabase
+    console.log(`[users/GET] Fetching users for ${profile.role} from ${profile.institution}`)
+
+    // Fetch users - let RLS handle filtering
+    const { data, error, count } = await supabase
       .from("profiles")
-      .select("id, email, full_name, role, institution, approval_status, created_at")
+      .select("id, email, full_name, role, institution, approval_status, created_at", { count: 'exact' })
       .order("full_name", { ascending: true })
 
+    console.log("[users/GET] Query completed. Count:", count, "Data length:", data?.length || 0)
+    
     if (error) {
-      console.error("Error fetching users:", error)
-      throw error
+      console.error("[users/GET] Query error:", error)
+      return NextResponse.json(
+        { 
+          error: "Failed to fetch users",
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        },
+        { status: 500 }
+      )
     }
 
-    // Return empty array if no data instead of null
+    // Additional logging for debugging
+    if (data && data.length === 0) {
+      console.warn("[users/GET] No users returned. This might be an RLS policy issue.")
+      console.warn("[users/GET] User role:", profile.role)
+      console.warn("[users/GET] User institution:", profile.institution)
+    }
+
     return NextResponse.json(data || [])
+    
   } catch (error) {
-    console.error("Error fetching users:", error)
+    console.error("[users/GET] Unexpected error:", error)
     return NextResponse.json(
       { 
-        error: error instanceof Error ? error.message : "Failed to fetch users",
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
         details: error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
@@ -79,7 +114,7 @@ export async function PATCH(request: NextRequest) {
     // Check if user is Institution Manager or Head of Programs
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, institution")
       .eq("id", user.id)
       .single()
 
@@ -131,7 +166,7 @@ export async function PATCH(request: NextRequest) {
     // Get target user info before update
     const { data: targetUser, error: targetError } = await supabase
       .from("profiles")
-      .select("full_name, email, role")
+      .select("full_name, email, role, institution")
       .eq("id", userId)
       .single()
 
@@ -145,6 +180,14 @@ export async function PATCH(request: NextRequest) {
 
     if (!targetUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    // Institution Managers can only update users from their own institution
+    if (profile.role === "institution_manager" && targetUser.institution !== profile.institution) {
+      return NextResponse.json(
+        { error: "You can only modify users from your own institution" },
+        { status: 403 }
+      )
     }
 
     // Update the user's role

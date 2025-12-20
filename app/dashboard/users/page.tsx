@@ -1,10 +1,8 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 
-// Reusing same UI components
-const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "" }: any) => (
+// UI Components
+const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "" }) => (
   <button
     onClick={onClick}
     disabled={disabled}
@@ -13,6 +11,8 @@ const Button = ({ children, onClick, disabled, variant = "default", size = "defa
         ? "border border-gray-300 hover:bg-gray-50" 
         : variant === "ghost"
         ? "hover:bg-gray-100"
+        : variant === "destructive"
+        ? "bg-red-600 text-white hover:bg-red-700"
         : "bg-cyan-500 text-white hover:bg-cyan-600"
     } ${size === "sm" ? "text-sm px-3 py-1" : ""} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className}`}
   >
@@ -20,113 +20,61 @@ const Button = ({ children, onClick, disabled, variant = "default", size = "defa
   </button>
 )
 
-const Card = ({ children, className = "" }: any) => (
-  <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
+const Card = ({ children, className = "" }) => <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
+const CardHeader = ({ children, className = "" }) => <div className={`p-6 border-b ${className}`}>{children}</div>
+const CardTitle = ({ children, className = "" }) => <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
+const CardContent = ({ children, className = "" }) => <div className={`p-6 ${className}`}>{children}</div>
+const Badge = ({ children, className = "" }) => <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>{children}</span>
+const Input = ({ value, onChange, placeholder, className = "" }) => (
+  <input type="text" value={value} onChange={onChange} placeholder={placeholder} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
+)
+const Label = ({ children, htmlFor }) => <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">{children}</label>
+const Alert = ({ children, className = "" }) => <div className={`rounded-lg p-4 border ${className}`}>{children}</div>
+const Textarea = ({ value, onChange, placeholder, rows = 3, className = "" }) => (
+  <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
 )
 
-const CardHeader = ({ children }: any) => (
-  <div className="p-6 border-b">{children}</div>
-)
-
-const CardTitle = ({ children, className = "" }: any) => (
-  <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
-)
-
-const CardContent = ({ children }: any) => (
-  <div className="p-6">{children}</div>
-)
-
-const Badge = ({ children, className = "" }: any) => (
-  <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>
-    {children}
-  </span>
-)
-
-const Input = ({ value, onChange, placeholder }: any) => (
-  <input
-    type="text"
-    value={value}
-    onChange={onChange}
-    placeholder={placeholder}
-    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-  />
-)
-
-const Label = ({ children, htmlFor }: any) => (
-  <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">
-    {children}
-  </label>
-)
-
-const Alert = ({ children, className = "" }: any) => (
-  <div className={`rounded-lg p-4 border ${className}`}>{children}</div>
-)
-
-// Icons
-const Users = () => <span>👥</span>
-const Building2 = () => <span>🏢</span>
-const Award = () => <span>🏆</span>
-const Shield = () => <span>🛡️</span>
-
-const ROLE_INFO: Record<string, any> = {
-  instructor: {
-    label: "Instructor",
-    description: "Submit and track submissions",
-    color: "bg-blue-100 text-blue-800"
-  },
-  senior_instructor: {
-    label: "Senior Instructor",
-    description: "Secondary approval for PC reviews",
-    color: "bg-purple-100 text-purple-800"
-  },
-  pc: {
-    label: "PC Reviewer",
-    description: "Primary reviewer - first level",
-    color: "bg-yellow-100 text-yellow-800"
-  },
-  amo: {
-    label: "AMO Reviewer",
-    description: "Primary reviewer - final approval",
-    color: "bg-orange-100 text-orange-800"
-  },
-  institution_manager: {
-    label: "Institution Manager",
-    description: "Manages users within institution",
-    color: "bg-cyan-100 text-cyan-800"
-  },
-  records: {
-    label: "Records Manager",
-    description: "Archive and manage records",
-    color: "bg-green-100 text-green-800"
-  }
+const ROLE_INFO = {
+  instructor: { label: "Instructor", description: "Submit and track submissions", color: "bg-blue-100 text-blue-800" },
+  senior_instructor: { label: "Senior Instructor", description: "Secondary approval for PC reviews", color: "bg-purple-100 text-purple-800" },
+  pc: { label: "PC Reviewer", description: "Primary reviewer - first level", color: "bg-yellow-100 text-yellow-800" },
+  amo: { label: "AMO Reviewer", description: "Primary reviewer - final approval", color: "bg-orange-100 text-orange-800" },
+  institution_manager: { label: "Institution Manager", description: "Manages users within institution", color: "bg-cyan-100 text-cyan-800" },
+  records: { label: "Records Manager", description: "Archive and manage records", color: "bg-green-100 text-green-800" },
+  head_of_programs: { label: "Head of Programs", description: "System administrator - all institutions", color: "bg-red-100 text-red-800" }
 }
 
-interface User {
-  id: string
-  email: string
-  full_name: string
-  role: string
-  institution: string
-  created_at: string
+const INSTITUTION_COLORS = {
+  "Boys Town": "bg-blue-100 text-blue-800",
+  "Stony Hill": "bg-green-100 text-green-800",
+  "Leap": "bg-purple-100 text-purple-800"
 }
 
-export default function InstitutionManagerUserManagement() {
+export default function UnifiedUserManagement() {
   const supabase = createClient()
-  const [currentInstitution, setCurrentInstitution] = useState("")
-  const [users, setUsers] = useState<User[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
+  
+  const [users, setUsers] = useState([])
+  const [filteredUsers, setFilteredUsers] = useState([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [filterInstitution, setFilterInstitution] = useState("")
+  const [filterStatus, setFilterStatus] = useState("")
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [modalType, setModalType] = useState(null)
   const [newRole, setNewRole] = useState("instructor")
+  const [rejectReason, setRejectReason] = useState("")
+  const [removeReason, setRemoveReason] = useState("")
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(null)
+  const [currentUserRole, setCurrentUserRole] = useState("")
+  const [currentUserInstitution, setCurrentUserInstitution] = useState("")
+  const [activeTab, setActiveTab] = useState("users")
 
+  // Fetch current user info
   useEffect(() => {
-    fetchCurrentUserAndInstitution()
+    fetchCurrentUser()
   }, [])
 
-  const fetchCurrentUserAndInstitution = async () => {
+  const fetchCurrentUser = async () => {
     try {
       if (!supabase) {
         setError("Database connection not available")
@@ -141,7 +89,7 @@ export default function InstitutionManagerUserManagement() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("institution, role")
+        .select("role, institution")
         .eq("id", user.id)
         .single()
 
@@ -150,14 +98,15 @@ export default function InstitutionManagerUserManagement() {
         return
       }
 
-      if (profile.role !== "institution_manager") {
-        setError("Unauthorized - Institution Manager access only")
+      if (!["institution_manager", "head_of_programs"].includes(profile.role)) {
+        setError("Unauthorized - Institution Manager or Head of Programs access only")
         return
       }
 
-      setCurrentInstitution(profile.institution)
-      await fetchUsers(profile.institution)
-    } catch (err: any) {
+      setCurrentUserRole(profile.role)
+      setCurrentUserInstitution(profile.institution)
+      await fetchUsers()
+    } catch (err) {
       console.error("Error:", err)
       setError(err.message || "Failed to load data")
     } finally {
@@ -165,65 +114,52 @@ export default function InstitutionManagerUserManagement() {
     }
   }
 
-  const fetchUsers = async (institution: string) => {
+  const fetchUsers = async () => {
     try {
       if (!supabase) return
 
       const { data, error: fetchError } = await supabase
         .from("profiles")
         .select("id, email, full_name, role, institution, created_at")
-        .eq("institution", institution)
-        .eq("approval_status", "approved")
         .order("full_name", { ascending: true })
 
       if (fetchError) throw fetchError
 
       setUsers(data || [])
       setFilteredUsers(data || [])
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error fetching users:", err)
       setError(err.message || "Failed to fetch users")
     }
   }
 
+  // Filter users
   useEffect(() => {
+    let filtered = users
+
     if (searchQuery) {
-      const filtered = users.filter(
+      filtered = filtered.filter(
         (user) =>
           user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
           user.role.toLowerCase().includes(searchQuery.toLowerCase())
       )
-      setFilteredUsers(filtered)
-    } else {
-      setFilteredUsers(users)
     }
-  }, [searchQuery, users])
+    if (filterInstitution) filtered = filtered.filter((u) => u.institution === filterInstitution)
+    setFilteredUsers(filtered)
+  }, [searchQuery, filterInstitution, users])
 
-  const getRoleStats = () => {
-    const stats: Record<string, number> = {}
-    users.forEach((user) => {
-      stats[user.role] = (stats[user.role] || 0) + 1
-    })
-    return stats
-  }
+  const pendingCount = 0
+  const approvedCount = users.length
+  const rejectedCount = 0
+  const institutions = [...new Set(users.map((u) => u.institution))]
 
-  const roleStats = getRoleStats()
-
-  const handleRoleChange = (user: User) => {
-    setSelectedUser(user)
-    setNewRole(user.role)
-    setIsModalOpen(true)
-  }
-
-  const handleUpdateRole = async () => {
-    if (!selectedUser) return
-
+  const handleUpdateRole = async (userId) => {
     try {
       const response = await fetch("/api/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: selectedUser.id, role: newRole })
+        body: JSON.stringify({ userId, role: newRole })
       })
 
       if (!response.ok) {
@@ -231,20 +167,55 @@ export default function InstitutionManagerUserManagement() {
         throw new Error(error.error || "Failed to update role")
       }
 
-      await fetchUsers(currentInstitution)
-      setIsModalOpen(false)
+      await fetchUsers()
+      setModalType(null)
       setSelectedUser(null)
-    } catch (err: any) {
+    } catch (err) {
       alert(err.message || "Failed to update role")
     }
   }
+
+  const handleRemoveUser = async (userId) => {
+    if (!removeReason.trim()) {
+      alert("Please provide a reason for removal")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/users/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, reason: removeReason })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to remove user")
+      }
+
+      await fetchUsers()
+      setModalType(null)
+      setSelectedUser(null)
+      setRemoveReason("")
+    } catch (err) {
+      alert(err.message || "Failed to remove user")
+    }
+  }
+
+  const openModal = (type, user) => {
+    setSelectedUser(user)
+    setModalType(type)
+    if (type === 'role') setNewRole(user.role)
+  }
+
+  const isHeadOfPrograms = currentUserRole === "head_of_programs"
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">Loading users...</p>
         </div>
       </div>
     )
@@ -254,8 +225,11 @@ export default function InstitutionManagerUserManagement() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Alert className="max-w-md bg-red-50 border-red-200">
-          <p className="text-red-900 font-semibold">Error</p>
+          <p className="text-red-900 font-semibold">Error loading users</p>
           <p className="text-red-700 text-sm mt-1">{error}</p>
+          <Button onClick={fetchCurrentUser} variant="outline" className="mt-4">
+            Retry
+          </Button>
         </Alert>
       </div>
     )
@@ -267,199 +241,290 @@ export default function InstitutionManagerUserManagement() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Users />
+            <span className="text-3xl">👥</span>
             <h1 className="text-4xl font-bold text-gray-900">User Management</h1>
           </div>
-          <p className="text-gray-600">Manage user roles and permissions for your institution</p>
-          <div className="flex items-center gap-2 mt-2">
-            <Building2 />
-            <span className="text-sm text-gray-600">
-              Managing users from: <Badge className="bg-blue-100 text-blue-800">{currentInstitution}</Badge>
-            </span>
-          </div>
+          <p className="text-gray-600">
+            {isHeadOfPrograms ? "Head of Programs - Manage all users across all institutions" : `Institution Manager - Manage users from ${currentUserInstitution}`}
+          </p>
         </div>
 
-        {/* Institution Notice */}
-        <Alert className="mb-6 bg-blue-50 border-blue-200">
-          <div className="flex gap-3">
-            <Building2 />
-            <div>
-              <h4 className="font-semibold text-blue-900 mb-2">Institution-Based Access</h4>
-              <p className="text-sm text-blue-800">
-                You can only view and manage users from <strong>{currentInstitution}</strong>. Users can only access 
-                submissions and data from their assigned institution.
-              </p>
-            </div>
+        {/* Tabs - Only show for Head of Programs */}
+        {isHeadOfPrograms && (
+          <div className="flex gap-2 mb-6 border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab("users")}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === "users"
+                  ? "border-red-500 text-red-600"
+                  : "border-transparent text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              User Management
+            </button>
+            <button
+              onClick={() => setActiveTab("admin")}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === "admin"
+                  ? "border-red-500 text-red-600"
+                  : "border-transparent text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              🔐 Super Admin Privileges
+            </button>
           </div>
-        </Alert>
+        )}
 
-        {/* Role Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-          {Object.entries(ROLE_INFO).map(([role, info]) => (
-            <Card key={role}>
-              <CardHeader>
-                <h4 className="text-xs font-medium text-gray-600">{info.label}</h4>
-              </CardHeader>
+        {activeTab === "users" ? (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <Card>
+                <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-gray-600">Total Users</CardTitle></CardHeader>
+                <CardContent><div className="text-4xl font-bold text-gray-900">{users.length}</div></CardContent>
+              </Card>
+              {isHeadOfPrograms && (
+                <Card className="border-2 border-amber-200">
+                  <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-amber-600">Pending Approval</CardTitle></CardHeader>
+                  <CardContent><div className="text-4xl font-bold text-amber-600">{pendingCount}</div></CardContent>
+                </Card>
+              )}
+              <Card>
+                <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-green-600">Active</CardTitle></CardHeader>
+                <CardContent><div className="text-4xl font-bold text-green-600">{approvedCount}</div></CardContent>
+              </Card>
+            </div>
+
+            {/* Search & Filter */}
+            <Card className="mb-6">
+              <CardHeader><CardTitle>Search & Filter</CardTitle></CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{roleStats[role] || 0}</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="search">Search</Label>
+                    <Input id="search" placeholder="Search by name or email..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                  </div>
+                  {isHeadOfPrograms && (
+                    <div>
+                      <Label htmlFor="institution">Institution</Label>
+                      <select id="institution" value={filterInstitution} onChange={(e) => setFilterInstitution(e.target.value)} className="w-full px-3 py-2 border rounded-md">
+                        <option value="">All Institutions</option>
+                        {institutions.map(inst => <option key={inst} value={inst}>{inst}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-
-        {/* Search & Users Table */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Institution Users</CardTitle>
-              <span className="text-sm text-gray-600">{filteredUsers.length} users</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-              <Label htmlFor="search">Search Users</Label>
-              <Input
-                id="search"
-                placeholder="Search by name, email, or role..."
-                value={searchQuery}
-                onChange={(e: any) => setSearchQuery(e.target.value)}
-              />
-            </div>
 
             {/* Users Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr className="border-b">
-                    <th className="px-4 py-3 text-left font-semibold">Name</th>
-                    <th className="px-4 py-3 text-left font-semibold">Email</th>
-                    <th className="px-4 py-3 text-left font-semibold">Role</th>
-                    <th className="px-4 py-3 text-left font-semibold">Secondary Approval</th>
-                    <th className="px-4 py-3 text-left font-semibold">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map((user) => {
-                    const roleInfo = ROLE_INFO[user.role]
-                    const canApprovePC = ["senior_instructor", "institution_manager"].includes(user.role)
-                    const canApproveAMO = user.role === "institution_manager"
-
-                    return (
-                      <tr key={user.id} className="border-b hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{user.full_name}</td>
-                        <td className="px-4 py-3 text-gray-600">{user.email}</td>
-                        <td className="px-4 py-3">
-                          <Badge className={roleInfo?.color || "bg-gray-100 text-gray-800"}>
-                            {roleInfo?.label || user.role}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          {canApprovePC || canApproveAMO ? (
-                            <div className="flex gap-1">
-                              {canApprovePC && (
-                                <Badge className="border border-yellow-300 bg-yellow-50 text-yellow-800 text-xs">
-                                  PC
-                                </Badge>
-                              )}
-                              {canApproveAMO && (
-                                <Badge className="border border-orange-300 bg-orange-50 text-orange-800 text-xs">
-                                  AMO
-                                </Badge>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-xs">None</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRoleChange(user)}
-                          >
-                            {user.role === "senior_instructor" && <Award />}
-                            Change Role
-                          </Button>
-                        </td>
+            <Card>
+              <CardHeader><CardTitle>All Users</CardTitle></CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr className="border-b">
+                        <th className="px-4 py-3 text-left font-semibold">Name</th>
+                        <th className="px-4 py-3 text-left font-semibold">Email</th>
+                        <th className="px-4 py-3 text-left font-semibold">Institution</th>
+                        <th className="px-4 py-3 text-left font-semibold">Role</th>
+                        <th className="px-4 py-3 text-left font-semibold">Actions</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map(user => {
+                        const roleInfo = ROLE_INFO[user.role]
+                        return (
+                          <tr key={user.id} className="border-b hover:bg-gray-50">
+                            <td className="px-4 py-3 font-medium">{user.full_name}</td>
+                            <td className="px-4 py-3 text-gray-600">{user.email}</td>
+                            <td className="px-4 py-3"><Badge className={INSTITUTION_COLORS[user.institution]}>{user.institution}</Badge></td>
+                            <td className="px-4 py-3"><Badge className={roleInfo?.color || "bg-gray-100"}>{roleInfo?.label || user.role}</Badge></td>
+                            <td className="px-4 py-3">
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => openModal('role', user)}>Change Role</Button>
+                                {isHeadOfPrograms && user.role !== 'head_of_programs' && (
+                                  <Button size="sm" variant="outline" onClick={() => openModal('remove', user)} className="text-red-600">Remove</Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          /* Super Admin Privileges Section */
+          <div className="space-y-6">
+            <Alert className="bg-red-50 border-red-200">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">🔐</span>
+                <div>
+                  <h4 className="font-semibold text-red-900 mb-1">Super Admin Privileges</h4>
+                  <p className="text-sm text-red-800">
+                    These are powerful administrative functions. Use with caution as changes affect the entire system across all institutions.
+                  </p>
+                </div>
+              </div>
+            </Alert>
 
-        {/* Role Change Modal */}
-        {isModalOpen && selectedUser && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* System Configuration */}
+              <Card className="border-2 border-red-200">
+                <CardHeader className="bg-red-50">
+                  <CardTitle className="text-red-900">🔧 System Configuration</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    📊 View System Analytics
+                  </Button>
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    ⚙️ Workflow Settings
+                  </Button>
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    📧 Email Templates
+                  </Button>
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    🏢 Institution Management
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* User Approvals */}
+              <Card className="border-2 border-amber-200">
+                <CardHeader className="bg-amber-50">
+                  <CardTitle className="text-amber-900">✅ Pending Approvals</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <p className="text-4xl mb-2">0</p>
+                    <p className="text-gray-600">No pending user registrations</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Audit & Compliance */}
+              <Card className="border-2 border-blue-200">
+                <CardHeader className="bg-blue-50">
+                  <CardTitle className="text-blue-900">📋 Audit & Compliance</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    📜 View Audit Logs (All Institutions)
+                  </Button>
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    📈 Generate Compliance Report
+                  </Button>
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    🔍 Review Activity Logs
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Security */}
+              <Card className="border-2 border-purple-200">
+                <CardHeader className="bg-purple-50">
+                  <CardTitle className="text-purple-900">🛡️ Security & Permissions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    🔑 Manage Access Levels
+                  </Button>
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    🚨 View Security Alerts
+                  </Button>
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    🔒 Password Policies
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Database Management */}
+              <Card className="border-2 border-green-200">
+                <CardHeader className="bg-green-50">
+                  <CardTitle className="text-green-900">💾 Database Management</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    💿 Backup Database
+                  </Button>
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    📦 Archive Old Records
+                  </Button>
+                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
+                    🧹 Data Cleanup Tools
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Dangerous Actions */}
+              <Card className="border-2 border-red-500">
+                <CardHeader className="bg-red-100">
+                  <CardTitle className="text-red-900">⚠️ Dangerous Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button variant="destructive" className="w-full justify-start">
+                    🗑️ Bulk Delete Users
+                  </Button>
+                  <Button variant="destructive" className="w-full justify-start">
+                    🔄 Reset All Passwords
+                  </Button>
+                  <Button variant="destructive" className="w-full justify-start">
+                    ⚡ Force Sync Database
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* Modals */}
+        {modalType && selectedUser && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h3 className="text-xl font-bold mb-4">Change User Role</h3>
-              <p className="text-gray-600 mb-4">
-                Update the role for {selectedUser.full_name} ({selectedUser.email})
-              </p>
-
-              <Alert className="mb-4 bg-blue-50 border-blue-200">
-                <div className="flex items-center gap-2 text-sm text-blue-800">
-                  <Building2 />
-                  <span>Institution: <strong>{selectedUser.institution}</strong></span>
-                </div>
-              </Alert>
-
-              <div className="mb-6">
-                <Label htmlFor="role">Select New Role</Label>
-                <select
-                  id="role"
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  {Object.entries(ROLE_INFO).map(([role, info]) => (
-                    <option key={role} value={role}>
-                      {info.label} - {info.description}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {newRole === "senior_instructor" && (
-                <Alert className="mb-4 bg-purple-50 border-purple-200">
-                  <div className="flex gap-2">
-                    <Award />
-                    <div className="text-sm text-purple-800">
-                      <p className="font-semibold mb-1">Senior Instructor</p>
-                      <p>This user will be able to provide secondary approval for PC reviews when the primary PC reviewer is unavailable.</p>
-                    </div>
+              {modalType === 'role' && (
+                <>
+                  <h3 className="text-xl font-bold mb-4">Change User Role</h3>
+                  <p className="text-gray-600 mb-4">Update the role for {selectedUser.full_name}</p>
+                  <div className="mb-6">
+                    <Label htmlFor="role">Select New Role</Label>
+                    <select id="role" value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full px-3 py-2 border rounded-md">
+                      {Object.entries(ROLE_INFO).map(([role, info]) => (
+                        <option key={role} value={role}>{info.label} - {info.description}</option>
+                      ))}
+                    </select>
                   </div>
-                </Alert>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setModalType(null)}>Cancel</Button>
+                    <Button onClick={() => handleUpdateRole(selectedUser.id)}>Update Role</Button>
+                  </div>
+                </>
               )}
 
-              {newRole === "institution_manager" && (
-                <Alert className="mb-4 bg-cyan-50 border-cyan-200">
-                  <div className="flex gap-2">
-                    <Shield />
-                    <div className="text-sm text-cyan-800">
-                      <p className="font-semibold mb-1">Full Secondary Approval Authority</p>
-                      <p>This user will be able to provide secondary approval for both PC and AMO reviews, and manage users from {selectedUser.institution}.</p>
+              {modalType === 'remove' && (
+                <>
+                  <h3 className="text-xl font-bold mb-4">Remove User</h3>
+                  <Alert className="bg-red-50 border-red-200 mb-4">
+                    <div className="flex items-start gap-2">
+                      <span>⚠️</span>
+                      <div className="text-sm">You are about to remove <strong>{selectedUser.full_name}</strong> from the system. This action cannot be undone.</div>
                     </div>
+                  </Alert>
+                  <div className="mb-6">
+                    <Label htmlFor="remove-reason">Reason for Removal <span className="text-red-500">*</span></Label>
+                    <Textarea id="remove-reason" placeholder="Enter reason for removal..." value={removeReason} onChange={(e) => setRemoveReason(e.target.value)} />
                   </div>
-                </Alert>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setModalType(null)}>Cancel</Button>
+                    <Button variant="destructive" onClick={() => handleRemoveUser(selectedUser.id)}>Remove User</Button>
+                  </div>
+                </>
               )}
-
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleUpdateRole}
-                  disabled={newRole === selectedUser.role}
-                >
-                  Update Role
-                </Button>
-              </div>
             </div>
           </div>
         )}

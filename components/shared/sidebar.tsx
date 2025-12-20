@@ -1,3 +1,4 @@
+// components/shared/sidebar.tsx
 "use client"
 
 import Link from "next/link"
@@ -36,7 +37,12 @@ export default function Sidebar({ userRole }: SidebarProps) {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["all"] },
     { href: "/dashboard/submissions", label: "Submissions", icon: FileText, roles: ["all"] },
     { href: "/dashboard/archive", label: "Archive", icon: Archive, roles: ["records", "head_of_programs"] },
-    { href: "/dashboard/users", label: "User Management", icon: Users, roles: ["institution_manager", "head_of_programs"] },
+    { 
+      href: "/dashboard/users", 
+      label: "User Management", 
+      icon: Users, 
+      roles: ["institution_manager", "head_of_programs"] // ✅ Both can access
+    },
     { href: "/dashboard/settings", label: "Settings", icon: Settings, roles: ["head_of_programs", "records", "institution_manager"] },
   ]
 
