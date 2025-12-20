@@ -32,50 +32,89 @@ export default function LoginPage() {
 
       if (!supabase) {
         setError("Authentication service is not configured. Please contact administrator.")
+        setLoading(false)
         return
       }
 
       const email = generateEmail(username)
 
+      // Attempt to sign in
       const { error: signInError, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (signInError) {
-        setError(signInError.message)
-      } else if (data.user) {
-        // Check approval status
+        // Handle authentication errors
+        if (signInError.message.includes("Invalid login credentials")) {
+          setError("Invalid username or password. Please try again.")
+        } else if (signInError.message.includes("Email not confirmed")) {
+          setError("Please verify your email address before signing in.")
+        } else {
+          setError(signInError.message)
+        }
+        setLoading(false)
+        return
+      }
+
+      // User authenticated successfully, now check approval status
+      if (data.user) {
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("approval_status, rejected_reason")
+          .select("approval_status, rejected_reason, role, full_name")
           .eq("id", data.user.id)
           .single()
 
         if (profileError) {
-          setError("Failed to verify account status")
+          console.error("Profile fetch error:", profileError)
+          setError("Failed to verify account status. Please contact support.")
           await supabase.auth.signOut()
-        } else if (profile.approval_status === "pending") {
+          setLoading(false)
+          return
+        }
+
+        // Check approval status
+        if (profile.approval_status === "pending") {
           setApprovalError(true)
           setError(
             "Your account is pending approval from the Head of Programs. You cannot sign in until your account has been approved."
           )
           await supabase.auth.signOut()
-        } else if (profile.approval_status === "rejected") {
+          setLoading(false)
+          return
+        }
+
+        if (profile.approval_status === "rejected") {
+          setApprovalError(true)
+          const reason = profile.rejected_reason 
+            ? `Reason: ${profile.rejected_reason}` 
+            : "Please contact the Head of Programs for more information."
+          setError(`Your account registration was rejected. ${reason}`)
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+
+        // Check if approval_status is explicitly "approved"
+        if (profile.approval_status !== "approved") {
           setApprovalError(true)
           setError(
-            `Your account registration was rejected. ${profile.rejected_reason ? `Reason: ${profile.rejected_reason}` : "Please contact the Head of Programs for more information."}`
+            "Your account status is uncertain. Please contact the Head of Programs for assistance."
           )
           await supabase.auth.signOut()
-        } else {
-          // Successful login
-          router.push("/dashboard")
+          setLoading(false)
+          return
         }
+
+        // All checks passed - successful login
+        router.push("/dashboard")
+      } else {
+        setError("Authentication failed. Please try again.")
+        setLoading(false)
       }
     } catch (err) {
-      console.error("[v0] Login error:", err)
-      setError("An unexpected error occurred")
-    } finally {
+      console.error("Login error:", err)
+      setError("An unexpected error occurred. Please try again.")
       setLoading(false)
     }
   }
@@ -113,6 +152,7 @@ export default function LoginPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
+                  disabled={loading}
                   className="border-none focus:ring-0 flex-1"
                 />
                 <span className="px-3 text-gray-500 font-medium bg-gray-50">@heart-nsta.org</span>
@@ -127,6 +167,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
 
@@ -162,7 +203,14 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full bg-cyan-500 hover:bg-cyan-600 text-white py-2 rounded-lg font-medium h-11"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                  Signing in...
+                </span>
+              ) : (
+                "Sign In"
+              )}
             </Button>
           </form>
 
@@ -177,9 +225,8 @@ export default function LoginPage() {
 
           {/* Info box about approval */}
           <Alert className="mt-4 bg-blue-50 border-blue-200">
-            <div className="text-xs text-blue-900">
-              <strong>Note:</strong> New instructor accounts require approval from the Head of Programs
-              before you can sign in.
+            <div className="text-sm text-blue-900">
+              <strong>Note:</strong> New instructor accounts require Head of Programs approval.
             </div>
           </Alert>
         </div>
