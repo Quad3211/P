@@ -14,11 +14,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user profile with institution
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role, institution")
       .eq("id", user.id)
       .single()
+
+    if (profileError) {
+      console.error("Profile fetch error:", profileError)
+      return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 })
+    }
 
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
@@ -27,29 +32,34 @@ export async function GET(request: NextRequest) {
     const role = profile.role
     const institution = profile.institution
 
-    // Base query - always filter by institution
+    // Base query - always filter by institution unless head_of_programs
     let query = supabase
       .from("submissions")
       .select("*")
-      .eq("institution", institution)
       .order("updated_at", { ascending: false })
+
+    // Head of Programs can see all submissions
+    if (role !== "head_of_programs") {
+      query = query.eq("institution", institution)
+    }
 
     // Additional role-based filtering
     if (role === "instructor") {
-      // Instructors only see their own submissions
       query = query.eq("instructor_id", user.id)
     } else if (!["pc", "amo", "head_of_programs", "institution_manager", "records", "senior_instructor"].includes(role)) {
-      // Other roles only see AMO-approved or later
       query = query.in("status", ["amo_approved", "final_archived"])
     }
-    // PC, AMO, IM, Records, Senior Instructor, and Admin see all submissions from their institution
 
     const { data, error } = await query
 
-    if (error) throw error
+    if (error) {
+      console.error("Submissions fetch error:", error)
+      throw error
+    }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data || [])
   } catch (error) {
+    console.error("GET /api/submissions error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch submissions" },
       { status: 500 }
@@ -72,13 +82,21 @@ export async function POST(request: NextRequest) {
     const { skill_area, skill_code, cohort, test_date, description, cluster } = body
 
     // Get profile info including institution
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("email, full_name, institution")
       .eq("id", user.id)
       .single()
 
-    if (!profile?.institution) {
+    if (profileError || !profile) {
+      console.error("Profile fetch error:", profileError)
+      return NextResponse.json(
+        { error: "User profile not found. Please contact administrator." },
+        { status: 400 }
+      )
+    }
+
+    if (!profile.institution) {
       return NextResponse.json(
         { error: "User institution not found. Please contact administrator." },
         { status: 400 }
@@ -108,11 +126,14 @@ export async function POST(request: NextRequest) {
       })
       .select()
 
-    if (error) throw error
+    if (error) {
+      console.error("Submission insert error:", error)
+      throw error
+    }
 
     return NextResponse.json(data[0], { status: 201 })
   } catch (error: any) {
-    console.error(error.message)
+    console.error("POST /api/submissions error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create submission" },
       { status: 500 },

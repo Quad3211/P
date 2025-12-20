@@ -13,11 +13,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user's profile to check role
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
+
+    if (profileError || !profile) {
+      console.error("Profile fetch error:", profileError)
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 })
+    }
 
     // Get submissions relevant to user based on their role
     let submissionsQuery = supabase
@@ -26,23 +31,31 @@ export async function GET(request: NextRequest) {
       .order("updated_at", { ascending: false })
 
     // Filter based on role
-    if (profile?.role === 'instructor') {
+    if (profile.role === 'instructor') {
       submissionsQuery = submissionsQuery.eq('instructor_id', user.id)
-    } else if (profile?.role === 'pc') {
+    } else if (profile.role === 'pc') {
       submissionsQuery = submissionsQuery.in('status', ['submitted', 'pc_review'])
-    } else if (profile?.role === 'amo') {
+    } else if (profile.role === 'amo') {
       submissionsQuery = submissionsQuery.in('status', ['amo_review'])
     }
     // Admin, IM, records see all
 
-    const { data: submissions } = await submissionsQuery
+    const { data: submissions, error: submissionsError } = await submissionsQuery
 
-    // Get pending reviews for user - FIXED: Separate queries
-    const { data: reviews } = await supabase
+    if (submissionsError) {
+      console.error("Submissions fetch error:", submissionsError)
+    }
+
+    // Get pending reviews for user
+    const { data: reviews, error: reviewsError } = await supabase
       .from("reviews")
       .select("id, submission_id, reviewer_role, created_at")
       .eq("reviewer_id", user.id)
       .eq("status", "pending")
+
+    if (reviewsError) {
+      console.error("Reviews fetch error:", reviewsError)
+    }
 
     // Get submission details for reviews
     let reviewsWithSubmissions = []
@@ -53,7 +66,6 @@ export async function GET(request: NextRequest) {
         .select("id, submission_id, title")
         .in("id", submissionIds)
 
-      // Map reviews with their submission data
       reviewsWithSubmissions = reviews.map(review => {
         const submission = reviewSubmissions?.find(s => s.id === review.submission_id)
         return {
@@ -69,7 +81,7 @@ export async function GET(request: NextRequest) {
       .select("id, action, created_at, details")
       .eq("action_type", "role_change")
       .order("created_at", { ascending: false })
-      .limit(50) // Get more initially, then filter
+      .limit(50)
 
     // Filter role changes for current user
     const userRoleChanges = roleChanges?.filter(rc => {
@@ -83,9 +95,9 @@ export async function GET(request: NextRequest) {
 
     const notifications = [
       // Submission status updates
-      ...(submissions?.filter(s => 
+      ...((submissions || []).filter(s => 
         s.status !== 'draft' && 
-        new Date(s.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
+        new Date(s.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       ).map((s) => ({
         id: `sub-${s.id}`,
         type: "submission" as const,
@@ -94,7 +106,7 @@ export async function GET(request: NextRequest) {
         timestamp: s.updated_at,
         read: false,
         submission_id: s.submission_id,
-      })) || []),
+      }))),
       
       // Pending reviews
       ...(reviewsWithSubmissions.map((r) => ({
