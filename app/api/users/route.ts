@@ -1,5 +1,5 @@
 // app/api/users/route.ts
-// Updated version with better error handling and logging
+// Updated with Institution Manager restrictions
 
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
@@ -19,7 +19,6 @@ export async function GET(request: NextRequest) {
 
     console.log("[users/GET] Authenticated user ID:", user.id)
 
-    // Get current user's profile with detailed logging
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role, institution, full_name")
@@ -55,7 +54,6 @@ export async function GET(request: NextRequest) {
 
     console.log(`[users/GET] Fetching users for ${profile.role} from ${profile.institution}`)
 
-    // Fetch users - let RLS handle filtering
     const { data, error, count } = await supabase
       .from("profiles")
       .select("id, email, full_name, role, institution, approval_status, created_at", { count: 'exact' })
@@ -77,7 +75,6 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Additional logging for debugging
     if (data && data.length === 0) {
       console.warn("[users/GET] No users returned. This might be an RLS policy issue.")
       console.warn("[users/GET] User role:", profile.role)
@@ -111,7 +108,6 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is Institution Manager or Head of Programs
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role, institution")
@@ -161,6 +157,22 @@ export async function PATCH(request: NextRequest) {
 
     if (!validRoles.includes(role)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 })
+    }
+
+    // 🔒 CRITICAL: Institution Managers cannot assign Head of Programs role
+    if (profile.role === "institution_manager" && role === "head_of_programs") {
+      return NextResponse.json(
+        { error: "Institution Managers cannot assign the Head of Programs role" },
+        { status: 403 }
+      )
+    }
+
+    // 🔒 CRITICAL: Institution Managers cannot promote themselves to Head of Programs
+    if (profile.role === "institution_manager" && userId === user.id && role === "head_of_programs") {
+      return NextResponse.json(
+        { error: "You cannot promote yourself to Head of Programs" },
+        { status: 403 }
+      )
     }
 
     // Get target user info before update
@@ -214,6 +226,7 @@ export async function PATCH(request: NextRequest) {
         old_role: targetUser.role,
         new_role: role,
         changed_by_id: user.id,
+        changed_by_role: profile.role,
       },
     })
 

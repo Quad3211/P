@@ -67,7 +67,7 @@ const Textarea = ({ value, onChange, placeholder, rows = 3, className = "" }: Te
   <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
 )
 
-const ROLE_INFO: Record<string, { label: string; description: string; color: string }> = {
+const ROLE_INFO: Record<string, any> = {
   instructor: { label: "Instructor", description: "Submit and track submissions", color: "bg-blue-100 text-blue-800" },
   senior_instructor: { label: "Senior Instructor", description: "Secondary approval for PC reviews", color: "bg-purple-100 text-purple-800" },
   pc: { label: "PC Reviewer", description: "Primary reviewer - first level", color: "bg-yellow-100 text-yellow-800" },
@@ -97,8 +97,8 @@ export default function UnifiedUserManagement() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentUserRole, setCurrentUserRole] = useState("")
+  const [currentUserId, setCurrentUserId] = useState("")
   const [currentUserInstitution, setCurrentUserInstitution] = useState("")
-  const [activeTab, setActiveTab] = useState<"users" | "admin">("users")
 
   // Fetch current user info
   useEffect(() => {
@@ -117,6 +117,8 @@ export default function UnifiedUserManagement() {
         setError("Not authenticated")
         return
       }
+
+      setCurrentUserId(user.id)
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -182,8 +184,41 @@ export default function UnifiedUserManagement() {
 
   const institutions = [...new Set(users.map((u) => u.institution))]
 
+  // Get available roles based on current user's role
+  const getAvailableRoles = (targetUserId: string) => {
+    const allRoles = Object.keys(ROLE_INFO)
+    
+    // Head of Programs can assign any role
+    if (currentUserRole === "head_of_programs") {
+      return allRoles
+    }
+    
+    // Institution Managers cannot assign Head of Programs role
+    // and cannot change themselves to Head of Programs
+    if (currentUserRole === "institution_manager") {
+      const restrictedRoles = allRoles.filter(role => {
+        // Cannot assign Head of Programs role at all
+        if (role === "head_of_programs") return false
+        
+        // If changing own role, cannot select Head of Programs
+        if (targetUserId === currentUserId && role === "head_of_programs") return false
+        
+        return true
+      })
+      return restrictedRoles
+    }
+    
+    return allRoles
+  }
+
   const handleUpdateRole = async (userId: string) => {
     try {
+      // Additional validation to prevent self-promotion
+      if (currentUserRole === "institution_manager" && userId === currentUserId && newRole === "head_of_programs") {
+        alert("Institution Managers cannot promote themselves to Head of Programs")
+        return
+      }
+
       const response = await fetch("/api/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -206,6 +241,12 @@ export default function UnifiedUserManagement() {
   const handleRemoveUser = async (userId: string) => {
     if (!removeReason.trim()) {
       alert("Please provide a reason for removal")
+      return
+    }
+
+    // Prevent self-removal
+    if (userId === currentUserId) {
+      alert("You cannot remove yourself from the system")
       return
     }
 
@@ -277,125 +318,84 @@ export default function UnifiedUserManagement() {
           </p>
         </div>
 
-        {/* Tabs - Only show for Head of Programs */}
-        {isHeadOfPrograms && (
-          <div className="flex gap-2 mb-6 border-b border-gray-200">
-            <button
-              onClick={() => setActiveTab("users")}
-              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-                activeTab === "users"
-                  ? "border-red-500 text-red-600"
-                  : "border-transparent text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              User Management
-            </button>
-            <button
-              onClick={() => setActiveTab("admin")}
-              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-                activeTab === "admin"
-                  ? "border-red-500 text-red-600"
-                  : "border-transparent text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              🔐 Super Admin Privileges
-            </button>
-          </div>
-        )}
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-gray-600">Total Users</CardTitle></CardHeader>
+            <CardContent><div className="text-4xl font-bold text-gray-900">{users.length}</div></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-green-600">Active</CardTitle></CardHeader>
+            <CardContent><div className="text-4xl font-bold text-green-600">{users.length}</div></CardContent>
+          </Card>
+        </div>
 
-        {activeTab === "users" ? (
-          <>
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-              <Card>
-                <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-gray-600">Total Users</CardTitle></CardHeader>
-                <CardContent><div className="text-4xl font-bold text-gray-900">{users.length}</div></CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-green-600">Active</CardTitle></CardHeader>
-                <CardContent><div className="text-4xl font-bold text-green-600">{users.length}</div></CardContent>
-              </Card>
-            </div>
-
-            {/* Search & Filter */}
-            <Card className="mb-6">
-              <CardHeader><CardTitle>Search & Filter</CardTitle></CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <Label htmlFor="search">Search</Label>
-                    <Input id="search" placeholder="Search by name or email..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                  </div>
-                  {isHeadOfPrograms && (
-                    <div>
-                      <Label htmlFor="institution">Institution</Label>
-                      <select id="institution" value={filterInstitution} onChange={(e) => setFilterInstitution(e.target.value)} className="w-full px-3 py-2 border rounded-md">
-                        <option value="">All Institutions</option>
-                        {institutions.map(inst => <option key={inst} value={inst}>{inst}</option>)}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Users Table */}
-            <Card>
-              <CardHeader><CardTitle>All Users</CardTitle></CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
-                      <tr className="border-b">
-                        <th className="px-4 py-3 text-left font-semibold">Name</th>
-                        <th className="px-4 py-3 text-left font-semibold">Email</th>
-                        <th className="px-4 py-3 text-left font-semibold">Institution</th>
-                        <th className="px-4 py-3 text-left font-semibold">Role</th>
-                        <th className="px-4 py-3 text-left font-semibold">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers.map(user => {
-                        const roleInfo = ROLE_INFO[user.role]
-                        return (
-                          <tr key={user.id} className="border-b hover:bg-gray-50">
-                            <td className="px-4 py-3 font-medium">{user.full_name}</td>
-                            <td className="px-4 py-3 text-gray-600">{user.email}</td>
-                            <td className="px-4 py-3"><Badge className={INSTITUTION_COLORS[user.institution]}>{user.institution}</Badge></td>
-                            <td className="px-4 py-3"><Badge className={roleInfo?.color || "bg-gray-100"}>{roleInfo?.label || user.role}</Badge></td>
-                            <td className="px-4 py-3">
-                              <div className="flex gap-2">
-                                <Button size="sm" variant="outline" onClick={() => openModal('role', user)}>Change Role</Button>
-                                {isHeadOfPrograms && user.role !== 'head_of_programs' && (
-                                  <Button size="sm" variant="outline" onClick={() => openModal('remove', user)} className="text-red-600">Remove</Button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        ) : (
-          /* Super Admin Privileges Section */
-          <div className="space-y-6">
-            <Alert className="bg-red-50 border-red-200">
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">🔐</span>
-                <div>
-                  <h4 className="font-semibold text-red-900 mb-1">Super Admin Privileges</h4>
-                  <p className="text-sm text-red-800">
-                    These are powerful administrative functions. Use with caution as changes affect the entire system across all institutions.
-                  </p>
-                </div>
+        {/* Search & Filter */}
+        <Card className="mb-6">
+          <CardHeader><CardTitle>Search & Filter</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <Label htmlFor="search">Search</Label>
+                <Input id="search" placeholder="Search by name or email..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
-            </Alert>
-          </div>
-        )}
+              {isHeadOfPrograms && (
+                <div>
+                  <Label htmlFor="institution">Institution</Label>
+                  <select id="institution" value={filterInstitution} onChange={(e) => setFilterInstitution(e.target.value)} className="w-full px-3 py-2 border rounded-md">
+                    <option value="">All Institutions</option>
+                    {institutions.map(inst => <option key={inst} value={inst}>{inst}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Users Table */}
+        <Card>
+          <CardHeader><CardTitle>All Users</CardTitle></CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr className="border-b">
+                    <th className="px-4 py-3 text-left font-semibold">Name</th>
+                    <th className="px-4 py-3 text-left font-semibold">Email</th>
+                    <th className="px-4 py-3 text-left font-semibold">Institution</th>
+                    <th className="px-4 py-3 text-left font-semibold">Role</th>
+                    <th className="px-4 py-3 text-left font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map(user => {
+                    const roleInfo = ROLE_INFO[user.role]
+                    const isCurrentUser = user.id === currentUserId
+                    return (
+                      <tr key={user.id} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium">
+                          {user.full_name}
+                          {isCurrentUser && <Badge className="ml-2 bg-blue-100 text-blue-800">You</Badge>}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{user.email}</td>
+                        <td className="px-4 py-3"><Badge className={INSTITUTION_COLORS[user.institution]}>{user.institution}</Badge></td>
+                        <td className="px-4 py-3"><Badge className={roleInfo?.color || "bg-gray-100"}>{roleInfo?.label || user.role}</Badge></td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => openModal('role', user)}>Change Role</Button>
+                            {isHeadOfPrograms && !isCurrentUser && user.role !== 'head_of_programs' && (
+                              <Button size="sm" variant="outline" onClick={() => openModal('remove', user)} className="text-red-600">Remove</Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Modals */}
         {modalType && selectedUser && (
@@ -404,13 +404,32 @@ export default function UnifiedUserManagement() {
               {modalType === 'role' && (
                 <>
                   <h3 className="text-xl font-bold mb-4">Change User Role</h3>
+                  
+                  {selectedUser.id === currentUserId && currentUserRole === "institution_manager" && (
+                    <Alert className="mb-4 bg-amber-50 border-amber-200">
+                      <p className="text-sm text-amber-900">
+                        ⚠️ You are changing your own role. You cannot promote yourself to Head of Programs.
+                      </p>
+                    </Alert>
+                  )}
+                  
                   <p className="text-gray-600 mb-4">Update the role for {selectedUser.full_name}</p>
                   <div className="mb-6">
                     <Label htmlFor="role">Select New Role</Label>
-                    <select id="role" value={newRole} onChange={(e) => setNewRole(e.target.value)} className="w-full px-3 py-2 border rounded-md">
-                      {Object.entries(ROLE_INFO).map(([role, info]) => (
-                        <option key={role} value={role}>{info.label} - {info.description}</option>
-                      ))}
+                    <select 
+                      id="role" 
+                      value={newRole} 
+                      onChange={(e) => setNewRole(e.target.value)} 
+                      className="w-full px-3 py-2 border rounded-md"
+                    >
+                      {getAvailableRoles(selectedUser.id).map(role => {
+                        const info = ROLE_INFO[role]
+                        return (
+                          <option key={role} value={role}>
+                            {info.label} - {info.description}
+                          </option>
+                        )
+                      })}
                     </select>
                   </div>
                   <div className="flex gap-2 justify-end">
