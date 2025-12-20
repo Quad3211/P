@@ -1,8 +1,41 @@
+"use client"
+
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 
+// Type definitions
+interface User {
+  id: string
+  email: string
+  full_name: string
+  role: string
+  institution: string
+  created_at: string
+}
+
+type ButtonProps = {
+  children: React.ReactNode
+  onClick?: () => void
+  disabled?: boolean
+  variant?: "default" | "outline" | "ghost" | "destructive"
+  size?: "default" | "sm"
+  className?: string
+}
+
+type CardProps = { children: React.ReactNode; className?: string }
+type LabelProps = { children: React.ReactNode; htmlFor?: string }
+type InputProps = { value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string; className?: string }
+type AlertProps = { children: React.ReactNode; className?: string }
+type TextareaProps = { 
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+  placeholder?: string
+  rows?: number
+  className?: string
+}
+
 // UI Components
-const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "" }) => (
+const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "" }: ButtonProps) => (
   <button
     onClick={onClick}
     disabled={disabled}
@@ -20,21 +53,21 @@ const Button = ({ children, onClick, disabled, variant = "default", size = "defa
   </button>
 )
 
-const Card = ({ children, className = "" }) => <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
-const CardHeader = ({ children, className = "" }) => <div className={`p-6 border-b ${className}`}>{children}</div>
-const CardTitle = ({ children, className = "" }) => <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
-const CardContent = ({ children, className = "" }) => <div className={`p-6 ${className}`}>{children}</div>
-const Badge = ({ children, className = "" }) => <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>{children}</span>
-const Input = ({ value, onChange, placeholder, className = "" }) => (
+const Card = ({ children, className = "" }: CardProps) => <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
+const CardHeader = ({ children, className = "" }: CardProps) => <div className={`p-6 border-b ${className}`}>{children}</div>
+const CardTitle = ({ children, className = "" }: CardProps) => <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
+const CardContent = ({ children, className = "" }: CardProps) => <div className={`p-6 ${className}`}>{children}</div>
+const Badge = ({ children, className = "" }: CardProps) => <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>{children}</span>
+const Input = ({ value, onChange, placeholder, className = "" }: InputProps) => (
   <input type="text" value={value} onChange={onChange} placeholder={placeholder} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
 )
-const Label = ({ children, htmlFor }) => <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">{children}</label>
-const Alert = ({ children, className = "" }) => <div className={`rounded-lg p-4 border ${className}`}>{children}</div>
-const Textarea = ({ value, onChange, placeholder, rows = 3, className = "" }) => (
+const Label = ({ children, htmlFor }: LabelProps) => <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">{children}</label>
+const Alert = ({ children, className = "" }: AlertProps) => <div className={`rounded-lg p-4 border ${className}`}>{children}</div>
+const Textarea = ({ value, onChange, placeholder, rows = 3, className = "" }: TextareaProps) => (
   <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
 )
 
-const ROLE_INFO = {
+const ROLE_INFO: Record<string, { label: string; description: string; color: string }> = {
   instructor: { label: "Instructor", description: "Submit and track submissions", color: "bg-blue-100 text-blue-800" },
   senior_instructor: { label: "Senior Instructor", description: "Secondary approval for PC reviews", color: "bg-purple-100 text-purple-800" },
   pc: { label: "PC Reviewer", description: "Primary reviewer - first level", color: "bg-yellow-100 text-yellow-800" },
@@ -44,7 +77,7 @@ const ROLE_INFO = {
   head_of_programs: { label: "Head of Programs", description: "System administrator - all institutions", color: "bg-red-100 text-red-800" }
 }
 
-const INSTITUTION_COLORS = {
+const INSTITUTION_COLORS: Record<string, string> = {
   "Boys Town": "bg-blue-100 text-blue-800",
   "Stony Hill": "bg-green-100 text-green-800",
   "Leap": "bg-purple-100 text-purple-800"
@@ -53,21 +86,19 @@ const INSTITUTION_COLORS = {
 export default function UnifiedUserManagement() {
   const supabase = createClient()
   
-  const [users, setUsers] = useState([])
-  const [filteredUsers, setFilteredUsers] = useState([])
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterInstitution, setFilterInstitution] = useState("")
-  const [filterStatus, setFilterStatus] = useState("")
-  const [selectedUser, setSelectedUser] = useState(null)
-  const [modalType, setModalType] = useState(null)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [modalType, setModalType] = useState<string | null>(null)
   const [newRole, setNewRole] = useState("instructor")
-  const [rejectReason, setRejectReason] = useState("")
   const [removeReason, setRemoveReason] = useState("")
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [currentUserRole, setCurrentUserRole] = useState("")
   const [currentUserInstitution, setCurrentUserInstitution] = useState("")
-  const [activeTab, setActiveTab] = useState("users")
+  const [activeTab, setActiveTab] = useState<"users" | "admin">("users")
 
   // Fetch current user info
   useEffect(() => {
@@ -106,9 +137,9 @@ export default function UnifiedUserManagement() {
       setCurrentUserRole(profile.role)
       setCurrentUserInstitution(profile.institution)
       await fetchUsers()
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error:", err)
-      setError(err.message || "Failed to load data")
+      setError(err instanceof Error ? err.message : "Failed to load data")
     } finally {
       setLoading(false)
     }
@@ -127,9 +158,9 @@ export default function UnifiedUserManagement() {
 
       setUsers(data || [])
       setFilteredUsers(data || [])
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error fetching users:", err)
-      setError(err.message || "Failed to fetch users")
+      setError(err instanceof Error ? err.message : "Failed to fetch users")
     }
   }
 
@@ -149,12 +180,9 @@ export default function UnifiedUserManagement() {
     setFilteredUsers(filtered)
   }, [searchQuery, filterInstitution, users])
 
-  const pendingCount = 0
-  const approvedCount = users.length
-  const rejectedCount = 0
   const institutions = [...new Set(users.map((u) => u.institution))]
 
-  const handleUpdateRole = async (userId) => {
+  const handleUpdateRole = async (userId: string) => {
     try {
       const response = await fetch("/api/users", {
         method: "PATCH",
@@ -170,12 +198,12 @@ export default function UnifiedUserManagement() {
       await fetchUsers()
       setModalType(null)
       setSelectedUser(null)
-    } catch (err) {
-      alert(err.message || "Failed to update role")
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to update role")
     }
   }
 
-  const handleRemoveUser = async (userId) => {
+  const handleRemoveUser = async (userId: string) => {
     if (!removeReason.trim()) {
       alert("Please provide a reason for removal")
       return
@@ -197,12 +225,12 @@ export default function UnifiedUserManagement() {
       setModalType(null)
       setSelectedUser(null)
       setRemoveReason("")
-    } catch (err) {
-      alert(err.message || "Failed to remove user")
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to remove user")
     }
   }
 
-  const openModal = (type, user) => {
+  const openModal = (type: string, user: User) => {
     setSelectedUser(user)
     setModalType(type)
     if (type === 'role') setNewRole(user.role)
@@ -278,20 +306,14 @@ export default function UnifiedUserManagement() {
         {activeTab === "users" ? (
           <>
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
               <Card>
                 <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-gray-600">Total Users</CardTitle></CardHeader>
                 <CardContent><div className="text-4xl font-bold text-gray-900">{users.length}</div></CardContent>
               </Card>
-              {isHeadOfPrograms && (
-                <Card className="border-2 border-amber-200">
-                  <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-amber-600">Pending Approval</CardTitle></CardHeader>
-                  <CardContent><div className="text-4xl font-bold text-amber-600">{pendingCount}</div></CardContent>
-                </Card>
-              )}
               <Card>
                 <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-green-600">Active</CardTitle></CardHeader>
-                <CardContent><div className="text-4xl font-bold text-green-600">{approvedCount}</div></CardContent>
+                <CardContent><div className="text-4xl font-bold text-green-600">{users.length}</div></CardContent>
               </Card>
             </div>
 
@@ -372,114 +394,6 @@ export default function UnifiedUserManagement() {
                 </div>
               </div>
             </Alert>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* System Configuration */}
-              <Card className="border-2 border-red-200">
-                <CardHeader className="bg-red-50">
-                  <CardTitle className="text-red-900">🔧 System Configuration</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    📊 View System Analytics
-                  </Button>
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    ⚙️ Workflow Settings
-                  </Button>
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    📧 Email Templates
-                  </Button>
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    🏢 Institution Management
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* User Approvals */}
-              <Card className="border-2 border-amber-200">
-                <CardHeader className="bg-amber-50">
-                  <CardTitle className="text-amber-900">✅ Pending Approvals</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <p className="text-4xl mb-2">0</p>
-                    <p className="text-gray-600">No pending user registrations</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Audit & Compliance */}
-              <Card className="border-2 border-blue-200">
-                <CardHeader className="bg-blue-50">
-                  <CardTitle className="text-blue-900">📋 Audit & Compliance</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    📜 View Audit Logs (All Institutions)
-                  </Button>
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    📈 Generate Compliance Report
-                  </Button>
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    🔍 Review Activity Logs
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Security */}
-              <Card className="border-2 border-purple-200">
-                <CardHeader className="bg-purple-50">
-                  <CardTitle className="text-purple-900">🛡️ Security & Permissions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    🔑 Manage Access Levels
-                  </Button>
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    🚨 View Security Alerts
-                  </Button>
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    🔒 Password Policies
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Database Management */}
-              <Card className="border-2 border-green-200">
-                <CardHeader className="bg-green-50">
-                  <CardTitle className="text-green-900">💾 Database Management</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    💿 Backup Database
-                  </Button>
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    📦 Archive Old Records
-                  </Button>
-                  <Button className="w-full justify-start bg-white text-gray-900 border border-gray-300 hover:bg-gray-50">
-                    🧹 Data Cleanup Tools
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Dangerous Actions */}
-              <Card className="border-2 border-red-500">
-                <CardHeader className="bg-red-100">
-                  <CardTitle className="text-red-900">⚠️ Dangerous Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button variant="destructive" className="w-full justify-start">
-                    🗑️ Bulk Delete Users
-                  </Button>
-                  <Button variant="destructive" className="w-full justify-start">
-                    🔄 Reset All Passwords
-                  </Button>
-                  <Button variant="destructive" className="w-full justify-start">
-                    ⚡ Force Sync Database
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
           </div>
         )}
 
