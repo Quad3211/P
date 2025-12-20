@@ -10,13 +10,13 @@ type UserRole = "instructor" | "pc" | "amo" | "institution_manager" | "registrat
 
 const ROLE_LABELS: Record<UserRole, string> = {
   instructor: "Instructor",
+  senior_instructor: "Senior Instructor",
   pc: "PC - Programme Coordinator",
   amo: "AMO - Academic Management",
-  institution_manager: "IM - Institution Manager",
+  institution_manager: "Institution Manager",
   registration: "Registration",
   records: "Records Manager",
   head_of_programs: "Head of Programs",
-  senior_instructor: "Senior Instructor",
 }
 
 interface NavigationProps {

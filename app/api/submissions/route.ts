@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     if (role === "instructor") {
       // Instructors only see their own submissions
       query = query.eq("instructor_id", user.id)
-    } else if (role !== "pc" && role !== "amo" && role !== "admin" && role !== "im" && role !== "records" && role !== "senior_instructor") {
+    } else if (!["pc", "amo", "head_of_programs", "institution_manager", "records", "senior_instructor"].includes(role)) {
       // Other roles only see AMO-approved or later
       query = query.in("status", ["amo_approved", "final_archived"])
     }
