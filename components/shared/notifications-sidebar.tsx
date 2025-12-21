@@ -56,26 +56,46 @@ export default function NotificationsSidebar() {
     }
   };
 
-  const markAsRead = (id: string) => {
+  // ✅ Persist read status to backend
+  const updateNotificationStatus = async (
+    notificationIds: string[],
+    read: boolean
+  ) => {
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationIds, read }),
+      });
+    } catch (error) {
+      console.error("Failed to update notification status:", error);
+    }
+  };
+
+  const markAsRead = async (id: string) => {
     setNotifications(
       notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
+    await updateNotificationStatus([id], true);
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
     setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    if (unreadIds.length > 0) {
+      await updateNotificationStatus(unreadIds, true);
+    }
   };
 
   const handleNotificationClick = async (notification: Notification) => {
     // Mark as read
-    markAsRead(notification.id);
+    await markAsRead(notification.id);
 
     // Close sidebar
     setIsOpen(false);
 
     // Navigate to submission if available
     if (notification.submission_id) {
-      // First, we need to get the actual submission ID from the API
       try {
         const response = await fetch("/api/submissions");
         if (response.ok) {

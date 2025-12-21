@@ -14,16 +14,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is Head of Programs
+    // Check if user is Head of Programs or Institution Manager
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
 
-    if (!profile || profile.role !== "head_of_programs") {
+    if (!profile || !['head_of_programs', 'institution_manager'].includes(profile.role)) {
       return NextResponse.json(
-        { error: "Only Head of Programs can remove users" },
+        { error: "Only Head of Programs and Institution Managers can remove users" },
         { status: 403 }
       )
     }
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Prevent removing other Head of Programs (optional safety check)
-    if (targetUser.role === "head_of_programs") {
+    if (targetUser.role === "head_of_programs" && profile.role !== "head_of_programs") {
       return NextResponse.json(
         { error: "Cannot remove Head of Programs accounts" },
         { status: 403 }
@@ -73,17 +73,15 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Delete from profiles (this will cascade to auth.users if set up correctly)
-    const { error: deleteError } = await supabase
-      .from("profiles")
-      .delete()
-      .eq("id", userId)
+    // ✅ Use the database function to delete from BOTH tables
+    const { error: deleteError } = await supabase.rpc('delete_user_completely', {
+      user_id: userId
+    })
 
-    if (deleteError) throw deleteError
-
-    // Also need to delete from auth.users (requires admin privileges)
-    // This would typically be done via a Supabase function or admin API
-    // For now, we'll just delete the profile and let the admin handle auth cleanup
+    if (deleteError) {
+      console.error("Delete error:", deleteError)
+      throw deleteError
+    }
 
     return NextResponse.json({
       success: true,
