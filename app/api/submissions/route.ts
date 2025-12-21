@@ -32,21 +32,21 @@ export async function GET(request: NextRequest) {
     const role = profile.role
     const institution = profile.institution
 
-    // Base query - Head of Programs can see all, others see only their institution
+    // Base query - Administrator can see all, others see only their institution
     let query = supabase
       .from("submissions")
       .select("*")
       .order("updated_at", { ascending: false })
 
-    // Head of Programs can see all submissions across all institutions
-    if (role !== "head_of_programs") {
+    // Administrator can see all submissions across all institutions
+    if (role !== "administrator") {
       query = query.eq("institution", institution)
     }
 
     // Additional role-based filtering
     if (role === "instructor" || role === "senior_instructor") {
       query = query.eq("instructor_id", user.id)
-    } else if (!["pc", "amo", "head_of_programs", "institution_manager", "records"].includes(role)) {
+    } else if (!["pc", "amo", "administrator", "institution_manager", "records"].includes(role)) {
       query = query.in("status", ["amo_approved", "final_archived"])
     }
 
@@ -115,8 +115,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify user's institution matches submission institution (unless Head of Programs)
-    if (profile.role !== "head_of_programs" && profile.institution !== submissionInstitution) {
+    // Verify user's institution matches submission institution (unless Administrator)
+    if (profile.role !== "administrator" && profile.institution !== submissionInstitution) {
       return NextResponse.json(
         { error: "You can only create submissions for your assigned institution" },
         { status: 403 }

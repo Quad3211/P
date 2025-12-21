@@ -36,14 +36,14 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["all"] },
     { href: "/dashboard/submissions", label: "Submissions", icon: FileText, roles: ["all"] },
-    { href: "/dashboard/archive", label: "Archive", icon: Archive, roles: ["records", "head_of_programs"] },
+    { href: "/dashboard/archive", label: "Archive", icon: Archive, roles: ["records", "administrator"] },
     { 
       href: "/dashboard/users", 
       label: "User Management", 
       icon: Users, 
-      roles: ["institution_manager", "head_of_programs"] // ✅ Both can access
+      roles: ["institution_manager", "administrator"] // ✅ Both can access
     },
-    { href: "/dashboard/settings", label: "Settings", icon: Settings, roles: ["head_of_programs", "records", "institution_manager"] },
+    { href: "/dashboard/settings", label: "Settings", icon: Settings, roles: ["administrator", "records", "institution_manager"] },
   ]
 
   const isActive = (href: string) => {

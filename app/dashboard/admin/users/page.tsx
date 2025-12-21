@@ -41,7 +41,7 @@ const ROLE_INFO: Record<string, any> = {
   amo: { label: "AMO Reviewer", description: "Primary reviewer - final approval", color: "bg-orange-100 text-orange-800" },
   institution_manager: { label: "Institution Manager", description: "Manages users within institution", color: "bg-cyan-100 text-cyan-800" },
   records: { label: "Records Manager", description: "Archive and manage records", color: "bg-green-100 text-green-800" },
-  head_of_programs: { label: "Head of Programs", description: "System administrator - all institutions", color: "bg-red-100 text-red-800" }
+  administrator: { label: "Administrator", description: "System administrator - all institutions", color: "bg-red-100 text-red-800" }
 }
 
 const INSTITUTION_COLORS: Record<string, string> = {
@@ -61,7 +61,7 @@ interface User {
   rejected_reason?: string
 }
 
-export default function HeadOfProgramsUserManagement() {
+export default function AdministratorUserManagement() {
   const supabase = createClient()
   
   const [users, setUsers] = useState<User[]>([])
@@ -92,7 +92,7 @@ export default function HeadOfProgramsUserManagement() {
         return
       }
 
-      // Fetch all users - Head of Programs can see all
+      // Fetch all users - Administrator can see all
       const { data, error: fetchError } = await supabase
         .from("profiles")
         .select("id, email, full_name, role, institution, approval_status, created_at, rejected_reason")
@@ -263,7 +263,7 @@ export default function HeadOfProgramsUserManagement() {
             <span className="text-3xl">👥</span>
             <h1 className="text-4xl font-bold text-gray-900">User Management</h1>
           </div>
-          <p className="text-gray-600">Head of Programs - Manage all users across all institutions</p>
+          <p className="text-gray-600">Administrator - Manage all users across all institutions</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

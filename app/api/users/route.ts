@@ -1,5 +1,5 @@
 // app/api/users/route.ts
-// Updated with Institution Manager restrictions
+// Updated with Institution Manager restrictions and Administrator role
 
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
@@ -44,10 +44,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
 
-    if (!["head_of_programs", "institution_manager"].includes(profile.role)) {
+    if (!["administrator", "institution_manager"].includes(profile.role)) {
       console.log("[users/GET] Insufficient permissions. Role:", profile.role)
       return NextResponse.json(
-        { error: `Only Institution Manager and Head of Programs users can view all users. Your role: ${profile.role}` },
+        { error: `Only Institution Manager and Administrator users can view all users. Your role: ${profile.role}` },
         { status: 403 }
       )
     }
@@ -126,9 +126,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
 
-    if (!["head_of_programs", "institution_manager"].includes(profile.role)) {
+    if (!["administrator", "institution_manager"].includes(profile.role)) {
       return NextResponse.json(
-        { error: "Only Institution Manager and Head of Programs users can change roles" },
+        { error: "Only Institution Manager and Administrator users can change roles" },
         { status: 403 }
       )
     }
@@ -152,25 +152,25 @@ export async function PATCH(request: NextRequest) {
       "institution_manager",
       "registration",
       "records",
-      "head_of_programs",
+      "administrator",
     ]
 
     if (!validRoles.includes(role)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 })
     }
 
-    // 🔒 CRITICAL: Institution Managers cannot assign Head of Programs role
-    if (profile.role === "institution_manager" && role === "head_of_programs") {
+    // 🔒 CRITICAL: Institution Managers cannot assign Administrator role
+    if (profile.role === "institution_manager" && role === "administrator") {
       return NextResponse.json(
-        { error: "Institution Managers cannot assign the Head of Programs role" },
+        { error: "Institution Managers cannot assign the Administrator role" },
         { status: 403 }
       )
     }
 
-    // 🔒 CRITICAL: Institution Managers cannot promote themselves to Head of Programs
-    if (profile.role === "institution_manager" && userId === user.id && role === "head_of_programs") {
+    // 🔒 CRITICAL: Institution Managers cannot promote themselves to Administrator
+    if (profile.role === "institution_manager" && userId === user.id && role === "administrator") {
       return NextResponse.json(
-        { error: "You cannot promote yourself to Head of Programs" },
+        { error: "You cannot promote yourself to Administrator" },
         { status: 403 }
       )
     }

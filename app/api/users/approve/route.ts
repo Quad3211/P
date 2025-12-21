@@ -14,16 +14,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is Head of Programs
+    // Check if user is Administrator
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
 
-    if (!profile || profile.role !== "head_of_programs") {
+    if (!profile || profile.role !== "administrator") {
       return NextResponse.json(
-        { error: "Only Head of Programs can approve users" },
+        { error: "Only Administrator can approve users" },
         { status: 403 }
       )
     }

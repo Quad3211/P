@@ -14,16 +14,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is Head of Programs or Institution Manager
+    // Check if user is Administrator or Institution Manager
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
 
-    if (!profile || !['head_of_programs', 'institution_manager'].includes(profile.role)) {
+    if (!profile || !['administrator', 'institution_manager'].includes(profile.role)) {
       return NextResponse.json(
-        { error: "Only Head of Programs and Institution Managers can remove users" },
+        { error: "Only Administrator and Institution Managers can remove users" },
         { status: 403 }
       )
     }
@@ -49,10 +49,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    // Prevent removing other Head of Programs (optional safety check)
-    if (targetUser.role === "head_of_programs" && profile.role !== "head_of_programs") {
+    // Prevent removing other Administrator accounts (optional safety check)
+    if (targetUser.role === "administrator" && profile.role !== "administrator") {
       return NextResponse.json(
-        { error: "Cannot remove Head of Programs accounts" },
+        { error: "Cannot remove Administrator accounts" },
         { status: 403 }
       )
     }

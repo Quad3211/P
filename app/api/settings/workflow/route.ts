@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
-    if (!["head_of_programs", "records", "institution_manager"].includes(profile?.role)) {
+    if (!["administrator", "records", "institution_manager"].includes(profile?.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
@@ -49,8 +49,8 @@ export async function PUT(request: NextRequest) {
 
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
-    if (profile?.role !== "head_of_programs") {
-      return NextResponse.json({ error: "Only Head of Programs can update settings" }, { status: 403 })
+    if (profile?.role !== "administrator") {
+      return NextResponse.json({ error: "Only Administrator can update settings" }, { status: 403 })
     }
 
     const body = await request.json()

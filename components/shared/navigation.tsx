@@ -6,7 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import NotificationsSidebar from "@/components/shared/notifications-sidebar"
 
-type UserRole = "instructor" | "pc" | "amo" | "institution_manager" | "registration" | "records" | "head_of_programs" | "senior_instructor"
+type UserRole = "instructor" | "pc" | "amo" | "institution_manager" | "registration" | "records" | "administrator" | "senior_instructor"
 
 const ROLE_LABELS: Record<UserRole, string> = {
   instructor: "Instructor",
@@ -16,7 +16,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   institution_manager: "Institution Manager",
   registration: "Registration",
   records: "Records Manager",
-  head_of_programs: "Head of Programs",
+  administrator: "Administrator",
 }
 
 interface NavigationProps {
