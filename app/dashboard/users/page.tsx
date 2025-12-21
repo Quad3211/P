@@ -24,9 +24,16 @@ type ButtonProps = {
 
 type CardProps = { children: React.ReactNode; className?: string }
 type LabelProps = { children: React.ReactNode; htmlFor?: string }
-type InputProps = { value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string; className?: string }
+type InputProps = { 
+  id?: string
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  placeholder?: string
+  className?: string
+}
 type AlertProps = { children: React.ReactNode; className?: string }
 type TextareaProps = { 
+  id?: string
   value: string
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
   placeholder?: string
@@ -58,13 +65,13 @@ const CardHeader = ({ children, className = "" }: CardProps) => <div className={
 const CardTitle = ({ children, className = "" }: CardProps) => <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
 const CardContent = ({ children, className = "" }: CardProps) => <div className={`p-6 ${className}`}>{children}</div>
 const Badge = ({ children, className = "" }: CardProps) => <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>{children}</span>
-const Input = ({ value, onChange, placeholder, className = "" }: InputProps) => (
-  <input type="text" value={value} onChange={onChange} placeholder={placeholder} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
+const Input = ({ id, value, onChange, placeholder, className = "" }: InputProps) => (
+  <input id={id} type="text" value={value} onChange={onChange} placeholder={placeholder} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
 )
 const Label = ({ children, htmlFor }: LabelProps) => <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">{children}</label>
 const Alert = ({ children, className = "" }: AlertProps) => <div className={`rounded-lg p-4 border ${className}`}>{children}</div>
-const Textarea = ({ value, onChange, placeholder, rows = 3, className = "" }: TextareaProps) => (
-  <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
+const Textarea = ({ id, value, onChange, placeholder, rows = 3, className = "" }: TextareaProps) => (
+  <textarea id={id} value={value} onChange={onChange} placeholder={placeholder} rows={rows} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
 )
 
 const ROLE_INFO: Record<string, any> = {
@@ -194,15 +201,10 @@ export default function UnifiedUserManagement() {
     }
     
     // Institution Managers cannot assign Head of Programs role
-    // and cannot change themselves to Head of Programs
     if (currentUserRole === "institution_manager") {
       const restrictedRoles = allRoles.filter(role => {
-        // Cannot assign Head of Programs role at all
         if (role === "head_of_programs") return false
-        
-        // If changing own role, cannot select Head of Programs
         if (targetUserId === currentUserId && role === "head_of_programs") return false
-        
         return true
       })
       return restrictedRoles
@@ -213,7 +215,6 @@ export default function UnifiedUserManagement() {
 
   const handleUpdateRole = async (userId: string) => {
     try {
-      // Additional validation to prevent self-promotion
       if (currentUserRole === "institution_manager" && userId === currentUserId && newRole === "head_of_programs") {
         alert("Institution Managers cannot promote themselves to Head of Programs")
         return
@@ -244,7 +245,6 @@ export default function UnifiedUserManagement() {
       return
     }
 
-    // Prevent self-removal
     if (userId === currentUserId) {
       alert("You cannot remove yourself from the system")
       return

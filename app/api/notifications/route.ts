@@ -1,4 +1,4 @@
-// app/api/notifications/route.ts - UPDATED VERSION
+// app/api/notifications/route.ts - FIXED VERSION
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
@@ -52,13 +52,6 @@ export async function GET(request: NextRequest) {
       console.error("Profile fetch error:", profileError)
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
-
-    // ✅ First, fetch existing notifications from database
-    const { data: existingNotifications } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
 
     // Get submissions relevant to user based on their role
     let submissionsQuery = supabase
@@ -125,53 +118,85 @@ export async function GET(request: NextRequest) {
       }
     }).slice(0, 5)
 
-    // Build notifications with persistent read status
-    const existingNotifMap = new Map(
-      (existingNotifications || []).map(n => [n.id, n.read])
-    )
-
-    const notifications = [
+    // Build notifications array with generated IDs
+    const generatedNotifications = [
       ...((submissions || []) as Submission[]).filter(s => 
         s.status !== 'draft' && 
         new Date(s.updated_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      ).map((s) => {
-        const notifId = `sub-${s.id}`
-        return {
-          id: notifId,
-          type: "submission" as const,
-          title: `${s.title} - ${s.status.replace(/_/g, ' ').toUpperCase()}`,
-          message: `Submission has been ${s.status.replace(/_/g, " ")}`,
-          timestamp: s.updated_at,
-          read: existingNotifMap.get(notifId) || false,
-          submission_id: s.submission_id,
-        }
-      }),
+      ).map((s) => ({
+        id: `sub-${s.id}`,
+        type: "submission" as const,
+        title: `${s.title} - ${s.status.replace(/_/g, ' ').toUpperCase()}`,
+        message: `Submission has been ${s.status.replace(/_/g, " ")}`,
+        timestamp: s.updated_at,
+        read: false,
+        submission_id: s.submission_id,
+      })),
       
-      ...reviewsWithSubmissions.map((r) => {
-        const notifId = `rev-${r.id}`
-        return {
-          id: notifId,
-          type: "review" as const,
-          title: `Review Required`,
-          message: `${r.submission?.title || 'A submission'} is pending your ${r.reviewer_role.toUpperCase()} review`,
-          timestamp: r.created_at,
-          read: existingNotifMap.get(notifId) || false,
-          submission_id: r.submission?.submission_id,
-        }
-      }),
+      ...reviewsWithSubmissions.map((r) => ({
+        id: `rev-${r.id}`,
+        type: "review" as const,
+        title: `Review Required`,
+        message: `${r.submission?.title || 'A submission'} is pending your ${r.reviewer_role.toUpperCase()} review`,
+        timestamp: r.created_at,
+        read: false,
+        submission_id: r.submission?.submission_id,
+      })),
       
-      ...userRoleChanges.map((rc) => {
-        const notifId = `role-${rc.id}`
-        return {
-          id: notifId,
-          type: "role_change" as const,
-          title: `Your Role Has Been Updated`,
-          message: rc.action,
-          timestamp: rc.created_at,
-          read: existingNotifMap.get(notifId) || false,
-        }
-      }),
+      ...userRoleChanges.map((rc) => ({
+        id: `role-${rc.id}`,
+        type: "role_change" as const,
+        title: `Your Role Has Been Updated`,
+        message: rc.action,
+        timestamp: rc.created_at,
+        read: false,
+      })),
     ]
+
+    // ✅ Get or create persistent notification records
+    const notificationIds = generatedNotifications.map(n => n.id)
+    
+    // Fetch existing notification records
+    const { data: existingNotifications } = await supabase
+      .from("notifications")
+      .select("id, read")
+      .eq("user_id", user.id)
+      .in("id", notificationIds)
+
+    const existingMap = new Map(
+      (existingNotifications || []).map(n => [n.id, n.read])
+    )
+
+    // ✅ Upsert all notifications to ensure they exist in the database
+    const notificationsToUpsert = generatedNotifications.map(n => ({
+      id: n.id,
+      user_id: user.id,
+      type: n.type,
+      title: n.title,
+      message: n.message,
+      submission_id: ('submission_id' in n) ? n.submission_id : null,
+      read: existingMap.get(n.id) ?? false,
+      created_at: n.timestamp,
+    }))
+
+    if (notificationsToUpsert.length > 0) {
+      const { error: upsertError } = await supabase
+        .from("notifications")
+        .upsert(notificationsToUpsert, {
+          onConflict: 'id',
+          ignoreDuplicates: false
+        })
+
+      if (upsertError) {
+        console.error("Error upserting notifications:", upsertError)
+      }
+    }
+
+    // Return notifications with persisted read status
+    const notifications = generatedNotifications.map(n => ({
+      ...n,
+      read: existingMap.get(n.id) ?? false
+    }))
 
     notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
@@ -185,7 +210,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ✅ NEW: Add PATCH endpoint to update notification read status
+// ✅ PATCH endpoint to update notification read status
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -208,22 +233,12 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Upsert notifications with read status
-    const notifications = notificationIds.map(id => ({
-      id,
-      user_id: user.id,
-      type: 'system', // placeholder
-      title: 'Notification',
-      message: 'Notification',
-      read: read !== false, // default to true if not specified
-    }))
-
+    // ✅ Update read status for specific notifications
     const { error } = await supabase
       .from("notifications")
-      .upsert(notifications, { 
-        onConflict: 'id',
-        ignoreDuplicates: false 
-      })
+      .update({ read: read !== false })
+      .eq("user_id", user.id)
+      .in("id", notificationIds)
 
     if (error) {
       console.error("Error updating notifications:", error)

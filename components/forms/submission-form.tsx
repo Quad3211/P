@@ -3,7 +3,7 @@
 "use client";
 
 import type React from "react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ interface Submission {
   cohort: string;
   test_date: string;
   description: string;
+  institution: string;
   status?: string;
 }
 
@@ -40,6 +41,9 @@ const getLocalDate = () => {
 export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
   const router = useRouter();
   const supabase = createClient();
+
+  const [userInstitution, setUserInstitution] = useState<string>("");
+  const [institutionLoading, setInstitutionLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     skill_area: "",
@@ -64,6 +68,61 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
     () => Array.from({ length: 20 }, (_, i) => i + 1),
     []
   );
+
+  // Fetch user's institution
+  useEffect(() => {
+    const fetchUserInstitution = async () => {
+      if (!supabase) {
+        setErrors({ submit: "Database connection not available" });
+        setInstitutionLoading(false);
+        return;
+      }
+
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          setErrors({ submit: "Not authenticated" });
+          setInstitutionLoading(false);
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("institution, approval_status")
+          .eq("id", user.id)
+          .single();
+
+        if (profileError) {
+          console.error("Failed to fetch profile:", profileError);
+          setErrors({ submit: "Failed to load user profile" });
+          setInstitutionLoading(false);
+          return;
+        }
+
+        if (!profile?.institution) {
+          setErrors({
+            submit:
+              "Your account is not assigned to an institution. Please contact an administrator.",
+          });
+          setInstitutionLoading(false);
+          return;
+        }
+
+        setUserInstitution(profile.institution);
+      } catch (error) {
+        console.error("Error fetching institution:", error);
+        setErrors({ submit: "Failed to load institution data" });
+      } finally {
+        setInstitutionLoading(false);
+      }
+    };
+
+    fetchUserInstitution();
+  }, [supabase]);
 
   const clearFieldError = (name: string) => {
     if (!errors[name]) return;
@@ -142,7 +201,6 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    // allow drop
     if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
     setIsDragging(true);
   };
@@ -168,7 +226,6 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
 
     validateAndSetFile(dropped);
 
-    // clear the native input so selecting the same file again triggers change
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -181,6 +238,7 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
     if (!formData.test_date.trim()) newErrors.test_date = "Required";
     if (!formData.description.trim()) newErrors.description = "Required";
     if (!file) newErrors.file = "File upload required";
+    if (!userInstitution) newErrors.submit = "Institution not loaded";
     return newErrors;
   };
 
@@ -194,38 +252,62 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
 
     setIsLoading(true);
     try {
-      const submission = (await createSubmission({
+      const submissionData = {
         skill_area: formData.skill_area,
         skill_code: formData.skill_code,
         cluster: formData.cluster,
         cohort: formData.cohort,
         test_date: formData.test_date,
         description: formData.description,
-      })) as Submission;
+        institution: userInstitution,
+      };
+
+      console.log("Creating submission with data:", submissionData);
+
+      const submission = (await createSubmission(submissionData)) as Submission;
+
+      console.log("Submission created:", submission);
 
       if (file) {
+        console.log("Uploading document...");
         await uploadDocument(submission.id, file);
+        console.log("Document uploaded successfully");
       }
 
-      await fetch(`/api/submissions/${submission.id}`, {
+      console.log("Updating submission status to 'submitted'...");
+      const statusResponse = await fetch(`/api/submissions/${submission.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "submitted" }),
       });
 
+      if (!statusResponse.ok) {
+        const statusError = await statusResponse.json();
+        console.error("Status update failed:", statusError);
+        throw new Error("Failed to update submission status");
+      }
+
+      console.log("Submission completed successfully!");
+
       if (onSubmit) onSubmit(submission);
       else router.push("/dashboard");
     } catch (error) {
       console.error("Submission failed:", error);
+
+      // Show more detailed error message
+      let errorMessage = "Failed to submit";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       setErrors({
-        submit: error instanceof Error ? error.message : "Failed to submit",
+        submit: errorMessage,
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Visual state for drop zone (keeps your existing look, adds drag highlight)
   const dropZoneClass = errors.file
     ? "border-red-400 bg-red-50"
     : file
@@ -234,8 +316,71 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
     ? "border-cyan-500 bg-cyan-50"
     : "border-slate-300 bg-slate-50 hover:border-cyan-400 hover:bg-cyan-50";
 
+  if (institutionLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-500 mx-auto mb-4" />
+          <p className="text-slate-600">Loading institution data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (errors.submit && !userInstitution) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <span className="text-red-600 text-xl">⚠️</span>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold text-red-900 mb-2">
+                  Institution Required
+                </h3>
+                <p className="text-sm text-red-800">{errors.submit}</p>
+                <Button
+                  onClick={() => router.push("/dashboard")}
+                  variant="outline"
+                  className="mt-4"
+                >
+                  Back to Dashboard
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {/* Institution Display */}
+      <Card className="border-cyan-200 bg-cyan-50">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 bg-cyan-100 rounded-full flex items-center justify-center">
+                <span className="text-cyan-600 text-xl">🏫</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-cyan-900">
+                Submitting for
+              </p>
+              <p className="text-lg font-bold text-cyan-900">
+                {userInstitution}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left side - Test Details */}
         <Card className="border-0 shadow-sm bg-white lg:col-span-1">
@@ -244,11 +389,11 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
               Submission Details
             </h3>
 
-            {/* Skill Area (Input) */}
             <div className="space-y-2">
               <Label
-                htmlFor="skill_area"
-                className="text-slate-700 font-semibold">
+                htmlFor="skill_code"
+                className="text-slate-700 font-semibold"
+              >
                 Programme Code <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -266,11 +411,11 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
               )}
             </div>
 
-            {/* Programme Skill Area */}
             <div className="space-y-2">
               <Label
                 htmlFor="skill_area"
-                className="text-slate-700 font-semibold">
+                className="text-slate-700 font-semibold"
+              >
                 Programme <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -288,12 +433,12 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
               )}
             </div>
 
-            {/* Cluster & Cohort */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label
                   htmlFor="cluster"
-                  className="text-slate-700 font-semibold">
+                  className="text-slate-700 font-semibold"
+                >
                   Cluster <span className="text-red-500">*</span>
                 </Label>
                 <select
@@ -303,7 +448,8 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
                   onChange={handleChange}
                   className={`w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-slate-900 bg-white ${
                     errors.cluster ? "border-red-500" : ""
-                  }`}>
+                  }`}
+                >
                   <option value="">Select a cluster</option>
                   {clusterOptions.map((num) => (
                     <option key={num} value={num}>
@@ -319,7 +465,8 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
               <div className="space-y-2">
                 <Label
                   htmlFor="cohort"
-                  className="text-slate-700 font-semibold">
+                  className="text-slate-700 font-semibold"
+                >
                   Cohort <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -338,11 +485,11 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
               </div>
             </div>
 
-            {/* Test Date */}
             <div className="space-y-2">
               <Label
                 htmlFor="test_date"
-                className="text-slate-700 font-semibold">
+                className="text-slate-700 font-semibold"
+              >
                 Test Date <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -360,11 +507,11 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
               )}
             </div>
 
-            {/* Description */}
             <div className="space-y-2">
               <Label
                 htmlFor="description"
-                className="text-slate-700 font-semibold">
+                className="text-slate-700 font-semibold"
+              >
                 Short Description{" "}
                 <span className="text-slate-500 font-normal">(Unit Code)</span>
                 <span className="text-red-500">*</span>
@@ -382,7 +529,7 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
           </CardContent>
         </Card>
 
-        {/* Right side - File Upload (with Drag & Drop) */}
+        {/* Right side - File Upload */}
         <Card className="border-0 shadow-sm bg-white lg:col-span-1">
           <CardContent className="pt-6 space-y-6">
             <h3 className="text-lg font-bold text-slate-900 mb-6">
@@ -494,7 +641,8 @@ export default function SubmissionForm({ onSubmit }: SubmissionFormProps) {
         <Button
           type="submit"
           disabled={isLoading}
-          className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold h-11 px-8">
+          className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold h-11 px-8"
+        >
           {isLoading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

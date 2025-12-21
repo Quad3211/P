@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 
+// ✅ Use exact values that match the database enum
 type Institution = "Boys Town" | "Stony Hill" | "Leap"
 
 export default function SignupPage() {
@@ -49,7 +50,7 @@ export default function SignupPage() {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             full_name: fullName,
-            institution: institution,
+            institution: institution, // ✅ This will now be "Boys Town", "Stony Hill", or "Leap"
             role: 'instructor',
           },
         },
