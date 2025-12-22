@@ -1,3 +1,6 @@
+// app/dashboard/users/page.tsx
+// UPDATED VERSION - Added Registration role to user management
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -16,8 +19,7 @@ interface User {
 type ButtonProps = {
   children: React.ReactNode
   onClick?: () => void
-  disabled?: boolean
-  variant?: "default" | "outline" | "ghost" | "destructive"
+  variant?: "default" | "outline"
   size?: "default" | "sm"
   className?: string
 }
@@ -42,19 +44,14 @@ type TextareaProps = {
 }
 
 // UI Components
-const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "" }: ButtonProps) => (
+const Button = ({ children, onClick, variant = "default", size = "default", className = "" }: ButtonProps) => (
   <button
     onClick={onClick}
-    disabled={disabled}
     className={`px-4 py-2 rounded font-medium transition-colors ${
       variant === "outline" 
         ? "border border-gray-300 hover:bg-gray-50" 
-        : variant === "ghost"
-        ? "hover:bg-gray-100"
-        : variant === "destructive"
-        ? "bg-red-600 text-white hover:bg-red-700"
         : "bg-cyan-500 text-white hover:bg-cyan-600"
-    } ${size === "sm" ? "text-sm px-3 py-1" : ""} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className}`}
+    } ${size === "sm" ? "text-sm px-3 py-1" : ""} ${className}`}
   >
     {children}
   </button>
@@ -74,15 +71,21 @@ const Textarea = ({ id, value, onChange, placeholder, rows = 3, className = "" }
   <textarea id={id} value={value} onChange={onChange} placeholder={placeholder} rows={rows} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
 )
 
+// ✅ UPDATED: Added registration role
 const ROLE_INFO: Record<string, any> = {
   instructor: { label: "Instructor", description: "Submit and track submissions", color: "bg-blue-100 text-blue-800" },
   senior_instructor: { label: "Senior Instructor", description: "Secondary approval for PC reviews", color: "bg-purple-100 text-purple-800" },
   pc: { label: "PC Reviewer", description: "Primary reviewer - first level", color: "bg-yellow-100 text-yellow-800" },
   amo: { label: "AMO Reviewer", description: "Primary reviewer - final approval", color: "bg-orange-100 text-orange-800" },
   institution_manager: { label: "Institution Manager", description: "Manages users within institution", color: "bg-cyan-100 text-cyan-800" },
+  registration: { label: "Registration Officer", description: "View-only access to users and submissions", color: "bg-pink-100 text-pink-800" },
   records: { label: "Records Manager", description: "Archive and manage records", color: "bg-green-100 text-green-800" },
-  head_of_programs: { label: "Head of Programs", description: "System administrator - all institutions", color: "bg-red-100 text-red-800" }
+  administrator: { label: "Administrator", description: "System administrator - all institutions", color: "bg-red-100 text-red-800" }
 }
+
+// Debug log to verify registration role is in the object
+console.log('ROLE_INFO keys:', Object.keys(ROLE_INFO))
+console.log('Registration role exists:', 'registration' in ROLE_INFO)
 
 const INSTITUTION_COLORS: Record<string, string> = {
   "Boys Town": "bg-blue-100 text-blue-800",
@@ -138,8 +141,8 @@ export default function UnifiedUserManagement() {
         return
       }
 
-      if (!['institution_manager', 'head_of_programs'].includes(profile.role)) {
-        setError("Unauthorized - Institution Manager or Head of Programs access only")
+      if (!['institution_manager', 'administrator'].includes(profile.role)) {
+        setError("Unauthorized - Institution Manager or Administrator access only")
         return
       }
 
@@ -167,7 +170,7 @@ export default function UnifiedUserManagement() {
       if (currentUserRole === "institution_manager") {
         query = query.eq("institution", currentUserInstitution)
       }
-      // Head of Programs can see all users (no filter)
+      // Administrator can see all users (no filter)
 
       const { data, error: fetchError } = await query
 
@@ -199,26 +202,35 @@ export default function UnifiedUserManagement() {
 
   const institutions = [...new Set(users.map((u) => u.institution))]
 
-  // Get available roles based on current user's role
+  // ✅ UPDATED: Get available roles - now includes registration for both IM and Admin
   const getAvailableRoles = (targetUserId: string) => {
-    const allRoles = Object.keys(ROLE_INFO)
+    // Define role order for consistent display
+    const roleOrder = [
+      'instructor',
+      'senior_instructor',
+      'pc',
+      'amo',
+      'institution_manager',
+      'registration',
+      'records',
+      'administrator'
+    ]
     
-    // Head of Programs can assign any role
-    if (currentUserRole === "head_of_programs") {
-      return allRoles
+    // Administrator can assign any role
+    if (currentUserRole === "administrator") {
+      return roleOrder
     }
     
-    // Institution Managers cannot assign Head of Programs role
+    // Institution Managers cannot assign Administrator role
     if (currentUserRole === "institution_manager") {
-      const restrictedRoles = allRoles.filter(role => {
-        if (role === "head_of_programs") return false
-        if (targetUserId === currentUserId && role === "head_of_programs") return false
+      return roleOrder.filter(role => {
+        if (role === "administrator") return false
+        if (targetUserId === currentUserId && role === "administrator") return false
         return true
       })
-      return restrictedRoles
     }
     
-    return allRoles
+    return roleOrder
   }
 
   // Check if current user can remove a specific user
@@ -226,16 +238,16 @@ export default function UnifiedUserManagement() {
     // Cannot remove yourself
     if (user.id === currentUserId) return false
     
-    // Head of Programs can remove anyone (except themselves)
-    if (currentUserRole === "head_of_programs") return true
+    // Administrator can remove anyone (except themselves)
+    if (currentUserRole === "administrator") return true
     
-    // Institution Manager can remove users from same institution (except Head of Programs)
+    // Institution Manager can remove users from same institution (except Administrator)
     if (currentUserRole === "institution_manager") {
       // Cannot remove users from other institutions
       if (user.institution !== currentUserInstitution) return false
       
-      // Cannot remove Head of Programs
-      if (user.role === "head_of_programs") return false
+      // Cannot remove Administrator
+      if (user.role === "administrator") return false
       
       return true
     }
@@ -245,8 +257,8 @@ export default function UnifiedUserManagement() {
 
   const handleUpdateRole = async (userId: string) => {
     try {
-      if (currentUserRole === "institution_manager" && userId === currentUserId && newRole === "head_of_programs") {
-        alert("Institution Managers cannot promote themselves to Head of Programs")
+      if (currentUserRole === "institution_manager" && userId === currentUserId && newRole === "administrator") {
+        alert("Institution Managers cannot promote themselves to Administrator")
         return
       }
 
@@ -307,7 +319,7 @@ export default function UnifiedUserManagement() {
     if (type === 'role') setNewRole(user.role)
   }
 
-  const isHeadOfPrograms = currentUserRole === "head_of_programs"
+  const isAdministrator = currentUserRole === "administrator"
 
   if (loading) {
     return (
@@ -344,7 +356,7 @@ export default function UnifiedUserManagement() {
             <h1 className="text-4xl font-bold text-gray-900">User Management</h1>
           </div>
           <p className="text-gray-600">
-            {isHeadOfPrograms ? "Head of Programs - Manage all users across all institutions" : `Institution Manager - Manage users from ${currentUserInstitution}`}
+            {isAdministrator ? "Administrator - Manage all users across all institutions" : `Institution Manager - Manage users from ${currentUserInstitution}`}
           </p>
         </div>
 
@@ -369,7 +381,7 @@ export default function UnifiedUserManagement() {
                 <Label htmlFor="search">Search</Label>
                 <Input id="search" placeholder="Search by name or email..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
-              {isHeadOfPrograms && (
+              {isAdministrator && (
                 <div>
                   <Label htmlFor="institution">Institution</Label>
                   <select id="institution" value={filterInstitution} onChange={(e) => setFilterInstitution(e.target.value)} className="w-full px-3 py-2 border rounded-md">
@@ -447,7 +459,7 @@ export default function UnifiedUserManagement() {
                   {selectedUser.id === currentUserId && currentUserRole === "institution_manager" && (
                     <Alert className="mb-4 bg-amber-50 border-amber-200">
                       <p className="text-sm text-amber-900">
-                        ⚠️ You are changing your own role. You cannot promote yourself to Head of Programs.
+                        ⚠️ You are changing your own role. You cannot promote yourself to Administrator.
                       </p>
                     </Alert>
                   )}
@@ -461,15 +473,30 @@ export default function UnifiedUserManagement() {
                       onChange={(e) => setNewRole(e.target.value)} 
                       className="w-full px-3 py-2 border rounded-md"
                     >
-                      {getAvailableRoles(selectedUser.id).map(role => {
-                        const info = ROLE_INFO[role]
-                        return (
-                          <option key={role} value={role}>
-                            {info.label} - {info.description}
-                          </option>
-                        )
-                      })}
+                      {(() => {
+                        const availableRoles = getAvailableRoles(selectedUser.id)
+                        console.log('Rendering dropdown with roles:', availableRoles)
+                        return availableRoles.map(role => {
+                          const info = ROLE_INFO[role]
+                          if (!info) {
+                            console.warn(`Missing ROLE_INFO for: ${role}`)
+                            return null
+                          }
+                          console.log(`Rendering option for ${role}:`, info.label)
+                          return (
+                            <option key={role} value={role}>
+                              {info.label} - {info.description}
+                            </option>
+                          )
+                        })
+                      })()}
                     </select>
+                    {/* Debug info */}
+                    <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
+                      <div>Your role: <strong>{currentUserRole}</strong></div>
+                      <div>Available roles: <strong>{getAvailableRoles(selectedUser.id).join(', ')}</strong></div>
+                      <div>Registration in ROLE_INFO: <strong>{String('registration' in ROLE_INFO)}</strong></div>
+                    </div>
                   </div>
                   <div className="flex gap-2 justify-end">
                     <Button variant="outline" onClick={() => setModalType(null)}>Cancel</Button>
@@ -500,7 +527,7 @@ export default function UnifiedUserManagement() {
                   </div>
                   <div className="flex gap-2 justify-end">
                     <Button variant="outline" onClick={() => setModalType(null)}>Cancel</Button>
-                    <Button variant="destructive" onClick={() => handleRemoveUser(selectedUser.id)}>Remove User</Button>
+                    <Button onClick={() => handleRemoveUser(selectedUser.id)} className="bg-red-600 hover:bg-red-700 text-white">Remove User</Button>
                   </div>
                 </>
               )}

@@ -1,3 +1,6 @@
+// app/dashboard/admin/users/page.tsx
+// UPDATED VERSION - Added Registration role for Administrator
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -34,12 +37,14 @@ const Textarea = ({ value, onChange, placeholder, rows = 3, className = "" }: an
   <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows} className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`} />
 )
 
+// ✅ UPDATED: Added registration role
 const ROLE_INFO: Record<string, any> = {
   instructor: { label: "Instructor", description: "Submit and track submissions", color: "bg-blue-100 text-blue-800" },
   senior_instructor: { label: "Senior Instructor", description: "Secondary approval for PC reviews", color: "bg-purple-100 text-purple-800" },
   pc: { label: "PC Reviewer", description: "Primary reviewer - first level", color: "bg-yellow-100 text-yellow-800" },
   amo: { label: "AMO Reviewer", description: "Primary reviewer - final approval", color: "bg-orange-100 text-orange-800" },
   institution_manager: { label: "Institution Manager", description: "Manages users within institution", color: "bg-cyan-100 text-cyan-800" },
+  registration: { label: "Registration Officer", description: "View-only access to users and submissions", color: "bg-pink-100 text-pink-800" },
   records: { label: "Records Manager", description: "Archive and manage records", color: "bg-green-100 text-green-800" },
   administrator: { label: "Administrator", description: "System administrator - all institutions", color: "bg-red-100 text-red-800" }
 }
