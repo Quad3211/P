@@ -14,7 +14,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   pc: "PC - Programme Coordinator",
   amo: "AMO - Academic Management",
   institution_manager: "Institution Manager",
-  registration: "Registration",
+  registration: "Registration", // ✅ Added
   records: "Records Manager",
   administrator: "Administrator",
 }

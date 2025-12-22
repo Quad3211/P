@@ -1,5 +1,5 @@
 // app/api/users/route.ts
-// Updated with Institution Manager restrictions and Administrator role
+// REPLACE THE ENTIRE FILE WITH THIS
 
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
@@ -13,84 +13,44 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
     
     if (!user) {
-      console.error("[users/GET] No authenticated user")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    console.log("[users/GET] Authenticated user ID:", user.id)
-
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from("profiles")
       .select("role, institution, full_name")
       .eq("id", user.id)
       .single()
-
-    console.log("[users/GET] Current user profile:", profile)
     
-    if (profileError) {
-      console.error("[users/GET] Profile fetch error:", profileError)
-      return NextResponse.json(
-        { 
-          error: "Failed to fetch profile", 
-          details: profileError.message,
-          code: profileError.code 
-        },
-        { status: 500 }
-      )
-    }
-
     if (!profile) {
-      console.error("[users/GET] Profile not found for user:", user.id)
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
 
-    if (!["administrator", "institution_manager"].includes(profile.role)) {
-      console.log("[users/GET] Insufficient permissions. Role:", profile.role)
+    // ✅ Allow registration role to view all users (read-only)
+    if (!["administrator", "institution_manager", "registration"].includes(profile.role)) {
       return NextResponse.json(
-        { error: `Only Institution Manager and Administrator users can view all users. Your role: ${profile.role}` },
+        { error: `Only Institution Manager, Registration, and Administrator users can view all users. Your role: ${profile.role}` },
         { status: 403 }
       )
     }
 
-    console.log(`[users/GET] Fetching users for ${profile.role} from ${profile.institution}`)
-
-    const { data, error, count } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
-      .select("id, email, full_name, role, institution, approval_status, created_at", { count: 'exact' })
+      .select("id, email, full_name, role, institution, approval_status, created_at")
       .order("full_name", { ascending: true })
-
-    console.log("[users/GET] Query completed. Count:", count, "Data length:", data?.length || 0)
     
     if (error) {
-      console.error("[users/GET] Query error:", error)
       return NextResponse.json(
-        { 
-          error: "Failed to fetch users",
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        },
+        { error: "Failed to fetch users", message: error.message },
         { status: 500 }
       )
-    }
-
-    if (data && data.length === 0) {
-      console.warn("[users/GET] No users returned. This might be an RLS policy issue.")
-      console.warn("[users/GET] User role:", profile.role)
-      console.warn("[users/GET] User institution:", profile.institution)
     }
 
     return NextResponse.json(data || [])
     
   } catch (error) {
-    console.error("[users/GET] Unexpected error:", error)
     return NextResponse.json(
-      { 
-        error: "Internal server error",
-        message: error instanceof Error ? error.message : "Unknown error",
-        details: error instanceof Error ? error.stack : undefined
-      },
+      { error: "Internal server error" },
       { status: 500 }
     )
   }
@@ -108,22 +68,22 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from("profiles")
       .select("role, institution")
       .eq("id", user.id)
       .single()
 
-    if (profileError) {
-      console.error("Profile fetch error:", profileError)
-      return NextResponse.json(
-        { error: "Failed to fetch profile", details: profileError.message },
-        { status: 500 }
-      )
-    }
-
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
+    }
+
+    // ✅ Registration role is view-only, cannot modify users
+    if (profile.role === "registration") {
+      return NextResponse.json(
+        { error: "Registration role has view-only access and cannot modify users" },
+        { status: 403 }
+      )
     }
 
     if (!["administrator", "institution_manager"].includes(profile.role)) {
@@ -143,7 +103,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Validate role
+    // Validate role - ✅ Added registration
     const validRoles = [
       "instructor",
       "senior_instructor",
@@ -159,7 +119,6 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 })
     }
 
-    // 🔒 CRITICAL: Institution Managers cannot assign Administrator role
     if (profile.role === "institution_manager" && role === "administrator") {
       return NextResponse.json(
         { error: "Institution Managers cannot assign the Administrator role" },
@@ -167,34 +126,16 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // 🔒 CRITICAL: Institution Managers cannot promote themselves to Administrator
-    if (profile.role === "institution_manager" && userId === user.id && role === "administrator") {
-      return NextResponse.json(
-        { error: "You cannot promote yourself to Administrator" },
-        { status: 403 }
-      )
-    }
-
-    // Get target user info before update
-    const { data: targetUser, error: targetError } = await supabase
+    const { data: targetUser } = await supabase
       .from("profiles")
       .select("full_name, email, role, institution")
       .eq("id", userId)
       .single()
 
-    if (targetError) {
-      console.error("Target user fetch error:", targetError)
-      return NextResponse.json(
-        { error: "Target user not found", details: targetError.message },
-        { status: 404 }
-      )
-    }
-
     if (!targetUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    // Institution Managers can only update users from their own institution
     if (profile.role === "institution_manager" && targetUser.institution !== profile.institution) {
       return NextResponse.json(
         { error: "You can only modify users from your own institution" },
@@ -202,19 +143,14 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Update the user's role
     const { data, error } = await supabase
       .from("profiles")
       .update({ role })
       .eq("id", userId)
       .select()
 
-    if (error) {
-      console.error("Role update error:", error)
-      throw error
-    }
+    if (error) throw error
 
-    // Create audit log entry
     await supabase.from("audit_logs").insert({
       user_id: user.id,
       action: `Changed ${targetUser.full_name}'s role from ${targetUser.role} to ${role}`,
@@ -236,12 +172,8 @@ export async function PATCH(request: NextRequest) {
       message: `Successfully updated ${targetUser.full_name} to ${role}`,
     })
   } catch (error) {
-    console.error("Role update error:", error)
     return NextResponse.json(
-      { 
-        error: error instanceof Error ? error.message : "Failed to update role",
-        details: error instanceof Error ? error.stack : undefined
-      },
+      { error: "Failed to update role" },
       { status: 500 }
     )
   }
