@@ -1,180 +1,195 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect } from 'react';
 
 // Type Definitions
 interface User {
-  id: string
-  email: string
-  full_name: string
-  role: string
-  institution: "Boys Town" | "Stony Hill" | "Leap"
-  approval_status: "pending" | "approved" | "rejected"
-  created_at: string
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  institution: "Boys Town" | "Stony Hill" | "Leap";
+  approval_status: "pending" | "approved" | "rejected";
+  created_at: string;
 }
 
 interface Submission {
-  id: string
-  submission_id: string
-  title?: string
-  skill_area?: string
-  instructor_id: string
-  instructor_name: string
-  institution: "Boys Town" | "Stony Hill" | "Leap"
-  status: string
-  created_at: string
-  updated_at?: string
+  id: string;
+  submission_id: string;
+  title?: string;
+  skill_area?: string;
+  instructor_id: string;
+  instructor_name: string;
+  institution: "Boys Town" | "Stony Hill" | "Leap";
+  status: string;
+  created_at: string;
+  updated_at?: string;
 }
 
 interface InstitutionStats {
-  total: number
-  pending: number
-  approved: number
+  total: number;
+  pending: number;
+  approved: number;
 }
 
 interface DashboardStats {
-  totalUsers: number
-  pendingApprovals: number
-  approvedUsers: number
-  totalSubmissions: number
-  activeSubmissions: number
-  byInstitution: Record<string, InstitutionStats>
-  recentSignups: number
+  totalUsers: number;
+  pendingApprovals: number;
+  approvedUsers: number;
+  totalSubmissions: number;
+  activeSubmissions: number;
+  byInstitution: Record<string, InstitutionStats>;
+  recentSignups: number;
 }
 
-// UI Components with proper types
-const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+// Component Props Types
+interface CardProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+interface InputProps {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  className?: string;
+}
+
+interface LabelProps {
+  children: React.ReactNode;
+  htmlFor?: string;
+}
+
+interface ButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: "default" | "outline";
+  size?: "default" | "sm";
+  className?: string;
+}
+
+// UI Components
+const Card = ({ children, className = "" }: CardProps) => (
   <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
-)
+);
 
-const CardHeader = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+const CardHeader = ({ children, className = "" }: CardProps) => (
   <div className={`p-6 border-b ${className}`}>{children}</div>
-)
+);
 
-const CardTitle = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+const CardTitle = ({ children, className = "" }: CardProps) => (
   <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
-)
+);
 
-const CardContent = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+const CardContent = ({ children, className = "" }: CardProps) => (
   <div className={`p-6 ${className}`}>{children}</div>
-)
+);
 
-const Badge = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+const Badge = ({ children, className = "" }: CardProps) => (
   <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>{children}</span>
-)
+);
 
-const Input = ({
-  id,
-  value,
-  onChange,
-  placeholder,
-  className = "",
-}: {
-  id?: string
-  value: string
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  placeholder?: string
-  className?: string
-}) => (
+const Input = ({ value, onChange, placeholder, className = "" }: InputProps) => (
   <input
-    id={id}
     type="text"
     value={value}
     onChange={onChange}
     placeholder={placeholder}
     className={`w-full px-3 py-2 border border-gray-300 rounded-md ${className}`}
   />
-)
+);
 
-const Label = ({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) => (
+const Label = ({ children, htmlFor }: LabelProps) => (
   <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">
     {children}
   </label>
-)
+);
 
-const INSTITUTION_COLORS: Record<string, string> = {
-  "Boys Town": "bg-blue-100 text-blue-800",
-  "Stony Hill": "bg-green-100 text-green-800",
-  Leap: "bg-purple-100 text-purple-800",
-}
-
-const ROLE_INFO: Record<string, { label: string; color: string }> = {
-  instructor: { label: "Instructor", color: "bg-blue-100 text-blue-800" },
-  senior_instructor: { label: "Senior Instructor", color: "bg-purple-100 text-purple-800" },
-  pc: { label: "PC", color: "bg-yellow-100 text-yellow-800" },
-  amo: { label: "AMO", color: "bg-orange-100 text-orange-800" },
-  institution_manager: { label: "Institution Manager", color: "bg-cyan-100 text-cyan-800" },
-  registration: { label: "Registration", color: "bg-pink-100 text-pink-800" },
-  records: { label: "Records", color: "bg-green-100 text-green-800" },
-  administrator: { label: "Administrator", color: "bg-red-100 text-red-800" },
-}
+const Button = ({ children, onClick, variant = "default", size = "default", className = "" }: ButtonProps) => {
+  const baseClasses = "px-4 py-2 rounded font-medium transition-colors";
+  const variantClasses = variant === "outline" 
+    ? "border border-gray-300 hover:bg-gray-50" 
+    : "bg-cyan-500 text-white hover:bg-cyan-600";
+  const sizeClasses = size === "sm" ? "text-sm px-3 py-1" : "";
+  
+  return (
+    <button
+      onClick={onClick}
+      className={`${baseClasses} ${variantClasses} ${sizeClasses} ${className}`}
+    >
+      {children}
+    </button>
+  );
+};
 
 export default function RegistrationDashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [users, setUsers] = useState<User[]>([])
-  const [submissions, setSubmissions] = useState<Submission[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [filterInstitution, setFilterInstitution] = useState("")
-  const [activeTab, setActiveTab] = useState<"overview" | "submissions">("overview")
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterInstitution, setFilterInstitution] = useState("");
+  const [activeTab, setActiveTab] = useState<"overview" | "submissions">("overview");
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    fetchData();
+  }, []);
 
   const fetchData = async () => {
     try {
-      setLoading(true)
+      setLoading(true);
 
       // Fetch users
-      const usersResponse = await fetch("/api/users")
+      const usersResponse = await fetch("/api/users");
       if (usersResponse.ok) {
-        const usersData: User[] = await usersResponse.json()
-        setUsers(usersData)
-
+        const usersData: User[] = await usersResponse.json();
+        setUsers(usersData);
+        
         // Fetch submissions
-        const submissionsResponse = await fetch("/api/submissions")
+        const submissionsResponse = await fetch("/api/submissions");
         if (submissionsResponse.ok) {
-          const submissionsData: Submission[] = await submissionsResponse.json()
-          setSubmissions(submissionsData)
-
+          const submissionsData: Submission[] = await submissionsResponse.json();
+          setSubmissions(submissionsData);
+          
           // Calculate stats with both datasets
-          calculateStats(usersData, submissionsData)
+          calculateStats(usersData, submissionsData);
         }
       }
     } catch (error) {
-      console.error("Failed to fetch data:", error)
+      console.error("Failed to fetch data:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const calculateStats = (usersData: User[], submissionsData: Submission[]) => {
-    const totalUsers = usersData.length
-    const pendingApprovals = usersData.filter((u) => u.approval_status === "pending").length
-    const approvedUsers = usersData.filter((u) => u.approval_status === "approved").length
-
-    const totalSubmissions = submissionsData.length
-    const activeSubmissions = submissionsData.filter((s) =>
-      ["submitted", "pc_review", "amo_review"].includes(s.status)
-    ).length
+    const totalUsers = usersData.length;
+    const pendingApprovals = usersData.filter(u => u.approval_status === 'pending').length;
+    const approvedUsers = usersData.filter(u => u.approval_status === 'approved').length;
+    
+    const totalSubmissions = submissionsData.length;
+    const activeSubmissions = submissionsData.filter(
+      s => ['submitted', 'pc_review', 'amo_review'].includes(s.status)
+    ).length;
 
     // Group by institution
-    const byInstitution: Record<string, InstitutionStats> = {}
-    usersData.forEach((user) => {
-      const inst = user.institution
+    const byInstitution: Record<string, InstitutionStats> = {};
+    usersData.forEach(user => {
+      const inst = user.institution;
       if (!byInstitution[inst]) {
-        byInstitution[inst] = { total: 0, pending: 0, approved: 0 }
+        byInstitution[inst] = { total: 0, pending: 0, approved: 0 };
       }
-      byInstitution[inst].total++
-      if (user.approval_status === "pending") byInstitution[inst].pending++
-      if (user.approval_status === "approved") byInstitution[inst].approved++
-    })
+      byInstitution[inst].total++;
+      if (user.approval_status === 'pending') byInstitution[inst].pending++;
+      if (user.approval_status === 'approved') byInstitution[inst].approved++;
+    });
 
     // Recent signups (last 7 days)
-    const weekAgo = new Date()
-    weekAgo.setDate(weekAgo.getDate() - 7)
-    const recentSignups = usersData.filter((u) => new Date(u.created_at) > weekAgo).length
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const recentSignups = usersData.filter(
+      u => new Date(u.created_at) > weekAgo
+    ).length;
 
     setStats({
       totalUsers,
@@ -183,19 +198,36 @@ export default function RegistrationDashboard() {
       totalSubmissions,
       activeSubmissions,
       byInstitution,
-      recentSignups,
-    })
-  }
+      recentSignups
+    });
+  };
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = 
       user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesInstitution = !filterInstitution || user.institution === filterInstitution
-    return matchesSearch && matchesInstitution
-  })
+      user.email?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesInstitution = !filterInstitution || user.institution === filterInstitution;
+    return matchesSearch && matchesInstitution;
+  });
 
-  const institutions: string[] = [...new Set(users.map((u) => u.institution))]
+  const institutions: string[] = [...new Set(users.map(u => u.institution))];
+
+  const INSTITUTION_COLORS: Record<string, string> = {
+    "Boys Town": "bg-blue-100 text-blue-800",
+    "Stony Hill": "bg-green-100 text-green-800",
+    "Leap": "bg-purple-100 text-purple-800"
+  };
+
+  const ROLE_INFO: Record<string, { label: string; color: string }> = {
+    instructor: { label: "Instructor", color: "bg-blue-100 text-blue-800" },
+    senior_instructor: { label: "Senior Instructor", color: "bg-purple-100 text-purple-800" },
+    pc: { label: "PC", color: "bg-yellow-100 text-yellow-800" },
+    amo: { label: "AMO", color: "bg-orange-100 text-orange-800" },
+    institution_manager: { label: "Institution Manager", color: "bg-cyan-100 text-cyan-800" },
+    registration: { label: "Registration", color: "bg-pink-100 text-pink-800" },
+    records: { label: "Records", color: "bg-green-100 text-green-800" },
+    administrator: { label: "Administrator", color: "bg-red-100 text-red-800" }
+  };
 
   if (loading) {
     return (
@@ -205,7 +237,7 @@ export default function RegistrationDashboard() {
           <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -270,29 +302,28 @@ export default function RegistrationDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {stats?.byInstitution &&
-                Object.entries(stats.byInstitution).map(([inst, data]) => (
-                  <div key={inst} className="p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-gray-900">{inst}</h4>
-                      <Badge className={INSTITUTION_COLORS[inst]}>{inst}</Badge>
+              {stats?.byInstitution && Object.entries(stats.byInstitution).map(([inst, data]) => (
+                <div key={inst} className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-900">{inst}</h4>
+                    <Badge className={INSTITUTION_COLORS[inst]}>{inst}</Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <p className="text-gray-500">Total</p>
+                      <p className="text-lg font-bold">{data.total}</p>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div>
-                        <p className="text-gray-500">Total</p>
-                        <p className="text-lg font-bold">{data.total}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Approved</p>
-                        <p className="text-lg font-bold text-green-600">{data.approved}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Pending</p>
-                        <p className="text-lg font-bold text-amber-600">{data.pending}</p>
-                      </div>
+                    <div>
+                      <p className="text-gray-500">Approved</p>
+                      <p className="text-lg font-bold text-green-600">{data.approved}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Pending</p>
+                      <p className="text-lg font-bold text-amber-600">{data.pending}</p>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -304,9 +335,8 @@ export default function RegistrationDashboard() {
             <div>
               <p className="font-semibold text-blue-900">Registration Role - View Only Access</p>
               <p className="text-sm text-blue-800 mt-1">
-                As a Registration officer, you have read-only access to view all users and submissions across all
-                institutions. You cannot modify any data. Contact an Administrator or Institution Manager to make
-                changes.
+                As a Registration officer, you have read-only access to view all users and submissions across all institutions. 
+                You cannot modify any data. Contact an Administrator or Institution Manager to make changes.
               </p>
             </div>
           </div>
@@ -317,7 +347,9 @@ export default function RegistrationDashboard() {
           <button
             onClick={() => setActiveTab("overview")}
             className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-              activeTab === "overview" ? "border-cyan-500 text-cyan-600" : "border-transparent text-gray-600"
+              activeTab === "overview"
+                ? "border-cyan-500 text-cyan-600"
+                : "border-transparent text-gray-600"
             }`}
           >
             Users Overview
@@ -325,7 +357,9 @@ export default function RegistrationDashboard() {
           <button
             onClick={() => setActiveTab("submissions")}
             className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-              activeTab === "submissions" ? "border-cyan-500 text-cyan-600" : "border-transparent text-gray-600"
+              activeTab === "submissions"
+                ? "border-cyan-500 text-cyan-600"
+                : "border-transparent text-gray-600"
             }`}
           >
             Submissions Overview
@@ -356,10 +390,8 @@ export default function RegistrationDashboard() {
                     className="w-full px-3 py-2 border rounded-md"
                   >
                     <option value="">All Institutions</option>
-                    {institutions.map((inst) => (
-                      <option key={inst} value={inst}>
-                        {inst}
-                      </option>
+                    {institutions.map(inst => (
+                      <option key={inst} value={inst}>{inst}</option>
                     ))}
                   </select>
                 </div>
@@ -379,28 +411,28 @@ export default function RegistrationDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.map((user) => {
-                      const roleInfo = ROLE_INFO[user.role] || { label: user.role, color: "bg-gray-100" }
+                    {filteredUsers.map(user => {
+                      const roleInfo = ROLE_INFO[user.role];
                       return (
                         <tr key={user.id} className="border-b hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium">{user.full_name}</td>
                           <td className="px-4 py-3 text-gray-600">{user.email}</td>
                           <td className="px-4 py-3">
-                            <Badge className={INSTITUTION_COLORS[user.institution]}>{user.institution}</Badge>
+                            <Badge className={INSTITUTION_COLORS[user.institution]}>
+                              {user.institution}
+                            </Badge>
                           </td>
                           <td className="px-4 py-3">
-                            <Badge className={roleInfo.color}>{roleInfo.label}</Badge>
+                            <Badge className={roleInfo?.color || "bg-gray-100"}>
+                              {roleInfo?.label || user.role}
+                            </Badge>
                           </td>
                           <td className="px-4 py-3">
-                            <Badge
-                              className={
-                                user.approval_status === "approved"
-                                  ? "bg-green-100 text-green-800"
-                                  : user.approval_status === "pending"
-                                    ? "bg-amber-100 text-amber-800"
-                                    : "bg-red-100 text-red-800"
-                              }
-                            >
+                            <Badge className={
+                              user.approval_status === "approved" ? "bg-green-100 text-green-800" :
+                              user.approval_status === "pending" ? "bg-amber-100 text-amber-800" :
+                              "bg-red-100 text-red-800"
+                            }>
                               {user.approval_status}
                             </Badge>
                           </td>
@@ -408,7 +440,7 @@ export default function RegistrationDashboard() {
                             {new Date(user.created_at).toLocaleDateString()}
                           </td>
                         </tr>
-                      )
+                      );
                     })}
                   </tbody>
                 </table>
@@ -433,13 +465,13 @@ export default function RegistrationDashboard() {
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <p className="text-sm text-gray-600">Completed</p>
                     <p className="text-3xl font-bold text-green-600">
-                      {submissions.filter((s) => s.status === "approved").length}
+                      {submissions.filter(s => s.status === 'approved').length}
                     </p>
                   </div>
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <p className="text-sm text-gray-600">In Review</p>
                     <p className="text-3xl font-bold text-amber-600">
-                      {submissions.filter((s) => ["pc_review", "amo_review"].includes(s.status)).length}
+                      {submissions.filter(s => ['pc_review', 'amo_review'].includes(s.status)).length}
                     </p>
                   </div>
                 </div>
@@ -456,23 +488,23 @@ export default function RegistrationDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {submissions.slice(0, 20).map((submission) => (
+                      {submissions.slice(0, 20).map(submission => (
                         <tr key={submission.id} className="border-b hover:bg-gray-50">
-                          <td className="px-4 py-3 font-mono text-xs text-cyan-600">{submission.submission_id}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-cyan-600">
+                            {submission.submission_id}
+                          </td>
                           <td className="px-4 py-3">
-                            <Badge className={INSTITUTION_COLORS[submission.institution]}>{submission.institution}</Badge>
+                            <Badge className={INSTITUTION_COLORS[submission.institution]}>
+                              {submission.institution}
+                            </Badge>
                           </td>
                           <td className="px-4 py-3">{submission.instructor_name}</td>
                           <td className="px-4 py-3">
-                            <Badge
-                              className={
-                                submission.status === "approved"
-                                  ? "bg-green-100 text-green-800"
-                                  : submission.status === "rejected"
-                                    ? "bg-red-100 text-red-800"
-                                    : "bg-yellow-100 text-yellow-800"
-                              }
-                            >
+                            <Badge className={
+                              submission.status === 'approved' ? "bg-green-100 text-green-800" :
+                              submission.status === 'rejected' ? "bg-red-100 text-red-800" :
+                              "bg-yellow-100 text-yellow-800"
+                            }>
                               {submission.status}
                             </Badge>
                           </td>
@@ -490,5 +522,5 @@ export default function RegistrationDashboard() {
         )}
       </div>
     </div>
-  )
+  );
 }
