@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Download, AlertCircle, Award } from "lucide-react"
+import { ArrowLeft, Download, AlertCircle, Award, Lock } from "lucide-react"
 import ReviewModal from "./review-modal"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -34,7 +34,7 @@ interface Submission {
 interface SubmissionDetailProps {
   submission: Submission
   onBack: () => void
-  reviewerRole?: "pc" | "amo" | "institution_manager" | "administrator" // ✅ CHANGED
+  reviewerRole?: "pc" | "amo" | "institution_manager" | "administrator"
   viewOnly?: boolean
 }
 
@@ -131,12 +131,13 @@ export default function SubmissionDetail({
     fetchSubmissionDetails()
   }, [submission.id, submission.submission_documents])
 
-  // ✅ FIXED: Replaced head_of_programs with administrator
   const isSecondaryApprover = ["institution_manager", "administrator", "senior_instructor"].includes(userRole)
   const isPrimaryReviewer = reviewerRole && userRole === reviewerRole
   const canReview = (isPrimaryReviewer || isSecondaryApprover) && !viewOnly
 
-  // Determine review type and stage
+  // ✅ CRITICAL: Only Records Manager can download
+  const canDownload = userRole === "records"
+
   let reviewType = "primary"
   let reviewStage = ""
   let canProvideSecondaryApproval = false
@@ -144,12 +145,10 @@ export default function SubmissionDetail({
   if (isSecondaryApprover && !isPrimaryReviewer) {
     reviewType = "secondary"
     
-    // Senior instructors can only approve PC stage
     if (userRole === "senior_instructor" && submission.status === "submitted") {
       canProvideSecondaryApproval = true
       reviewStage = "pc"
     }
-    // ✅ FIXED: Institution Manager and Administrator can approve both stages
     else if (["institution_manager", "administrator"].includes(userRole)) {
       if (submission.status === "submitted") {
         canProvideSecondaryApproval = true
@@ -167,6 +166,11 @@ export default function SubmissionDetail({
   const latestDoc = submission.submission_documents?.[0]
 
   const handleDownload = async () => {
+    if (!canDownload) {
+      alert("Only Records Managers can download submission files.")
+      return
+    }
+
     if (!latestDoc) return
 
     try {
@@ -233,7 +237,6 @@ export default function SubmissionDetail({
         Back
       </Button>
 
-      {/* Senior Instructor Secondary Approval Alert */}
       {userRole === "senior_instructor" && submission.status === "submitted" && !viewOnly && (
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
           <div className="flex gap-3">
@@ -249,7 +252,6 @@ export default function SubmissionDetail({
         </div>
       )}
 
-      {/* ✅ FIXED: Institution Manager/Administrator Secondary Approval Alert */}
       {["institution_manager", "administrator"].includes(userRole) && canProvideSecondaryApproval && !isPrimaryReviewer && !viewOnly && (
         <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4">
           <div className="flex gap-3">
@@ -259,6 +261,21 @@ export default function SubmissionDetail({
               <p className="text-sm text-cyan-800 mt-1">
                 You are authorized to approve or reject this submission as a secondary approver ({userRole === "institution_manager" ? "Institution Manager" : "Administrator"}) for the {reviewStage.toUpperCase()} stage.
                 Your decision will be recorded in the audit trail as a secondary review.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ NEW: Show info banner for non-records users */}
+      {!canDownload && latestDoc && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex gap-3">
+            <Lock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-amber-900">Download Restricted</p>
+              <p className="text-sm text-amber-800 mt-1">
+                Only Records Managers can download submission files. This restriction ensures proper document control and audit trails.
               </p>
             </div>
           </div>
@@ -307,7 +324,11 @@ export default function SubmissionDetail({
                     <p className="font-medium text-foreground text-sm truncate">
                       {latestDoc?.file_name || "No documents"}
                     </p>
-                    {latestDoc && (
+                    {/* ✅ Show lock icon instead of download for non-records users */}
+                    {latestDoc && !canDownload && (
+                      <Lock className="w-4 h-4 text-amber-500" />
+                    )}
+                    {latestDoc && canDownload && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -387,15 +408,31 @@ export default function SubmissionDetail({
               <CardTitle className="text-lg">Document Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button 
-                variant="outline" 
-                className="w-full gap-2" 
-                disabled={!latestDoc}
-                onClick={handleDownload}
-              >
-                <Download className="w-4 h-4" />
-                Download Document
-              </Button>
+              {canDownload ? (
+                <Button 
+                  variant="outline" 
+                  className="w-full gap-2" 
+                  disabled={!latestDoc}
+                  onClick={handleDownload}
+                >
+                  <Download className="w-4 h-4" />
+                  Download Document
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2 opacity-50 cursor-not-allowed" 
+                    disabled={true}
+                  >
+                    <Lock className="w-4 h-4" />
+                    Download Restricted
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Only Records Managers can download files
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

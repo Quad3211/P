@@ -16,7 +16,7 @@ interface Submission {
   submission_id: string;
   instructor_name?: string;
   course?: string;
-  skill_area: string; // fallback if course is null
+  skill_area: string;
   cohort: string;
   status: string;
   updated_at: string;
@@ -49,12 +49,36 @@ export default function SubmissionsPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string>("");
 
-  const [reviewsBySubmission, setReviewsBySubmission] =
-    useState<ReviewMap>({});
+  const [reviewsBySubmission, setReviewsBySubmission] = useState<ReviewMap>({});
   const [reviewsLoading, setReviewsLoading] = useState(false);
 
   if (!supabase) return null;
+
+  /* ---------- Fetch user role ---------- */
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+
+        if (profile) {
+          setUserRole(profile.role);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user role:", error);
+      }
+    };
+
+    fetchUserRole();
+  }, [supabase]);
 
   /* ---------- Fetch submissions ---------- */
   useEffect(() => {
@@ -125,6 +149,9 @@ export default function SubmissionsPage() {
     );
   }, [submissions, searchQuery]);
 
+  // Check if user can create new submissions (only instructors and PC)
+  const canCreateSubmission = userRole === "instructor" || userRole === "senior_instructor" || userRole === "pc";
+
   /* ================= RENDER ================= */
 
   return (
@@ -139,12 +166,15 @@ export default function SubmissionsPage() {
           </p>
         </div>
 
-        <Button asChild className="bg-cyan-500 hover:bg-cyan-600 text-white">
-          <Link href="/dashboard/submissions/new" className="gap-2">
-            <Plus className="w-4 h-4" />
-            New Submission
-          </Link>
-        </Button>
+        {/* Only show New Submission button for instructors and PC */}
+        {canCreateSubmission && (
+          <Button asChild className="bg-cyan-500 hover:bg-cyan-600 text-white">
+            <Link href="/dashboard/submissions/new" className="gap-2">
+              <Plus className="w-4 h-4" />
+              New Submission
+            </Link>
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -162,7 +192,7 @@ export default function SubmissionsPage() {
             <div className="text-center py-8">Loading...</div>
           ) : filteredSubmissions.length === 0 ? (
             <div className="text-center py-8 text-slate-600">
-              NO submissions found
+              No submissions found
             </div>
           ) : (
             <div className="overflow-x-auto">
