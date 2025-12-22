@@ -14,16 +14,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is Administrator or Institution Manager
+    // Check if user is Head of Programs or Institution Manager
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, institution")
       .eq("id", user.id)
       .single()
 
-    if (!profile || !['administrator', 'institution_manager'].includes(profile.role)) {
+    if (!profile || !['head_of_programs', 'institution_manager'].includes(profile.role)) {
       return NextResponse.json(
-        { error: "Only Administrator and Institution Managers can remove users" },
+        { error: "Only Head of Programs and Institution Managers can remove users" },
         { status: 403 }
       )
     }
@@ -49,10 +49,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    // Prevent removing other Administrator accounts (optional safety check)
-    if (targetUser.role === "administrator" && profile.role !== "administrator") {
+    // Institution Manager can only remove users from their own institution
+    if (profile.role === "institution_manager") {
+      if (targetUser.institution !== profile.institution) {
+        return NextResponse.json(
+          { error: "You can only remove users from your own institution" },
+          { status: 403 }
+        )
+      }
+      
+      // Institution Manager cannot remove Head of Programs
+      if (targetUser.role === "head_of_programs") {
+        return NextResponse.json(
+          { error: "Institution Managers cannot remove Head of Programs accounts" },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Nobody can remove themselves
+    if (userId === user.id) {
       return NextResponse.json(
-        { error: "Cannot remove Administrator accounts" },
+        { error: "You cannot remove yourself from the system" },
         { status: 403 }
       )
     }

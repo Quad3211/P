@@ -81,7 +81,7 @@ const ROLE_INFO: Record<string, any> = {
   amo: { label: "AMO Reviewer", description: "Primary reviewer - final approval", color: "bg-orange-100 text-orange-800" },
   institution_manager: { label: "Institution Manager", description: "Manages users within institution", color: "bg-cyan-100 text-cyan-800" },
   records: { label: "Records Manager", description: "Archive and manage records", color: "bg-green-100 text-green-800" },
-  administrator: { label: "Administrator", description: "System administrator - all institutions", color: "bg-red-100 text-red-800" }
+  head_of_programs: { label: "Head of Programs", description: "System administrator - all institutions", color: "bg-red-100 text-red-800" }
 }
 
 const INSTITUTION_COLORS: Record<string, string> = {
@@ -138,8 +138,8 @@ export default function UnifiedUserManagement() {
         return
       }
 
-      if (!['institution_manager', 'administrator'].includes(profile.role)) {
-        setError("Unauthorized - Institution Manager or Administrator access only")
+      if (!['institution_manager', 'head_of_programs'].includes(profile.role)) {
+        setError("Unauthorized - Institution Manager or Head of Programs access only")
         return
       }
 
@@ -158,10 +158,18 @@ export default function UnifiedUserManagement() {
     try {
       if (!supabase) return
 
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from("profiles")
         .select("id, email, full_name, role, institution, created_at")
         .order("full_name", { ascending: true })
+
+      // Institution Manager can only see users from their own institution
+      if (currentUserRole === "institution_manager") {
+        query = query.eq("institution", currentUserInstitution)
+      }
+      // Head of Programs can see all users (no filter)
+
+      const { data, error: fetchError } = await query
 
       if (fetchError) throw fetchError
 
@@ -195,16 +203,16 @@ export default function UnifiedUserManagement() {
   const getAvailableRoles = (targetUserId: string) => {
     const allRoles = Object.keys(ROLE_INFO)
     
-    // Administrator can assign any role
-    if (currentUserRole === "administrator") {
+    // Head of Programs can assign any role
+    if (currentUserRole === "head_of_programs") {
       return allRoles
     }
     
-    // Institution Managers cannot assign Administrator role
+    // Institution Managers cannot assign Head of Programs role
     if (currentUserRole === "institution_manager") {
       const restrictedRoles = allRoles.filter(role => {
-        if (role === "administrator") return false
-        if (targetUserId === currentUserId && role === "administrator") return false
+        if (role === "head_of_programs") return false
+        if (targetUserId === currentUserId && role === "head_of_programs") return false
         return true
       })
       return restrictedRoles
@@ -213,10 +221,32 @@ export default function UnifiedUserManagement() {
     return allRoles
   }
 
+  // Check if current user can remove a specific user
+  const canRemoveUser = (user: User) => {
+    // Cannot remove yourself
+    if (user.id === currentUserId) return false
+    
+    // Head of Programs can remove anyone (except themselves)
+    if (currentUserRole === "head_of_programs") return true
+    
+    // Institution Manager can remove users from same institution (except Head of Programs)
+    if (currentUserRole === "institution_manager") {
+      // Cannot remove users from other institutions
+      if (user.institution !== currentUserInstitution) return false
+      
+      // Cannot remove Head of Programs
+      if (user.role === "head_of_programs") return false
+      
+      return true
+    }
+    
+    return false
+  }
+
   const handleUpdateRole = async (userId: string) => {
     try {
-      if (currentUserRole === "institution_manager" && userId === currentUserId && newRole === "administrator") {
-        alert("Institution Managers cannot promote themselves to Administrator")
+      if (currentUserRole === "institution_manager" && userId === currentUserId && newRole === "head_of_programs") {
+        alert("Institution Managers cannot promote themselves to Head of Programs")
         return
       }
 
@@ -277,7 +307,7 @@ export default function UnifiedUserManagement() {
     if (type === 'role') setNewRole(user.role)
   }
 
-  const isAdministrator = currentUserRole === "administrator"
+  const isHeadOfPrograms = currentUserRole === "head_of_programs"
 
   if (loading) {
     return (
@@ -314,7 +344,7 @@ export default function UnifiedUserManagement() {
             <h1 className="text-4xl font-bold text-gray-900">User Management</h1>
           </div>
           <p className="text-gray-600">
-            {isAdministrator ? "Administrator - Manage all users across all institutions" : `Institution Manager - Manage users from ${currentUserInstitution}`}
+            {isHeadOfPrograms ? "Head of Programs - Manage all users across all institutions" : `Institution Manager - Manage users from ${currentUserInstitution}`}
           </p>
         </div>
 
@@ -339,7 +369,7 @@ export default function UnifiedUserManagement() {
                 <Label htmlFor="search">Search</Label>
                 <Input id="search" placeholder="Search by name or email..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
-              {isAdministrator && (
+              {isHeadOfPrograms && (
                 <div>
                   <Label htmlFor="institution">Institution</Label>
                   <select id="institution" value={filterInstitution} onChange={(e) => setFilterInstitution(e.target.value)} className="w-full px-3 py-2 border rounded-md">
@@ -371,6 +401,8 @@ export default function UnifiedUserManagement() {
                   {filteredUsers.map(user => {
                     const roleInfo = ROLE_INFO[user.role]
                     const isCurrentUser = user.id === currentUserId
+                    const canRemove = canRemoveUser(user)
+                    
                     return (
                       <tr key={user.id} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium">
@@ -383,8 +415,15 @@ export default function UnifiedUserManagement() {
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
                             <Button size="sm" variant="outline" onClick={() => openModal('role', user)}>Change Role</Button>
-                            {isAdministrator && !isCurrentUser && user.role !== 'administrator' && (
-                              <Button size="sm" variant="outline" onClick={() => openModal('remove', user)} className="text-red-600">Remove</Button>
+                            {canRemove && (
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => openModal('remove', user)} 
+                                className="text-red-600 hover:bg-red-50"
+                              >
+                                Remove
+                              </Button>
                             )}
                           </div>
                         </td>
@@ -408,7 +447,7 @@ export default function UnifiedUserManagement() {
                   {selectedUser.id === currentUserId && currentUserRole === "institution_manager" && (
                     <Alert className="mb-4 bg-amber-50 border-amber-200">
                       <p className="text-sm text-amber-900">
-                        ⚠️ You are changing your own role. You cannot promote yourself to Administrator.
+                        ⚠️ You are changing your own role. You cannot promote yourself to Head of Programs.
                       </p>
                     </Alert>
                   )}
@@ -445,7 +484,14 @@ export default function UnifiedUserManagement() {
                   <Alert className="bg-red-50 border-red-200 mb-4">
                     <div className="flex items-start gap-2">
                       <span>⚠️</span>
-                      <div className="text-sm">You are about to remove <strong>{selectedUser.full_name}</strong> from the system. This action cannot be undone.</div>
+                      <div className="text-sm">
+                        You are about to remove <strong>{selectedUser.full_name}</strong> from the system. This action cannot be undone.
+                        {currentUserRole === "institution_manager" && (
+                          <p className="mt-2 text-amber-900">
+                            As Institution Manager, you can only remove users from {currentUserInstitution}.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </Alert>
                   <div className="mb-6">
