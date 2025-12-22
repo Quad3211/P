@@ -11,6 +11,7 @@ import AMODashboard from "@/components/dashboards/amo-dashboard"
 import InstitutionManagerDashboard from "@/components/dashboards/institution_manager-dashboard"
 import RecordsDashboard from "@/components/dashboards/records-dashboard"
 import RegistrationDashboard from "@/components/dashboards/registration-dashboard"
+import AdministratorDashboard from "@/components/dashboards/administrator-dashboard" // ✅ NEW
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -80,17 +81,16 @@ export default function DashboardPage() {
       return <AMODashboard userName={userName} />
     
     case "institution_manager":
-    case "head_of_programs":
       return <InstitutionManagerDashboard userName={userName} />
+    
+    case "administrator":
+      return <AdministratorDashboard userName={userName} /> // ✅ NEW - Separate admin dashboard
     
     case "records":
       return <RecordsDashboard userName={userName} />
     
     case "registration":
       return <RegistrationDashboard />
-    
-    case "administrator":
-      return <InstitutionManagerDashboard userName={userName} />
     
     default:
       return (
