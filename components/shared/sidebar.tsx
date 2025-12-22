@@ -1,4 +1,5 @@
 // components/shared/sidebar.tsx
+// FIXED VERSION with correct routes
 "use client"
 
 import Link from "next/link"
@@ -38,10 +39,11 @@ export default function Sidebar({ userRole }: SidebarProps) {
     { href: "/dashboard/submissions", label: "Submissions", icon: FileText, roles: ["all"] },
     { href: "/dashboard/archive", label: "Archive", icon: Archive, roles: ["records", "administrator"] },
     { 
-      href: "/dashboard/users", 
+      // ✅ FIXED: Use correct route for administrators
+      href: userRole === "administrator" ? "/dashboard/admin/users" : "/dashboard/users",
       label: "User Management", 
       icon: Users, 
-      roles: ["institution_manager", "administrator"] // ✅ Both can access
+      roles: ["institution_manager", "administrator"]
     },
     { href: "/dashboard/settings", label: "Settings", icon: Settings, roles: ["administrator", "records", "institution_manager"] },
   ]

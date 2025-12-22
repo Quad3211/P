@@ -17,23 +17,64 @@ import {
   RefreshCw
 } from "lucide-react"
 
+// Type definitions
+interface CardProps {
+  children: React.ReactNode
+  className?: string
+}
+
+interface ButtonProps {
+  children: React.ReactNode
+  onClick?: () => void
+  variant?: "default" | "outline"
+  size?: "default" | "sm"
+  className?: string
+}
+
+interface AdministratorDashboardProps {
+  userName: string
+}
+
+interface InstitutionStat {
+  name: string
+  users: number
+  submissions: number
+  active: number
+  approved: number
+}
+
+interface ActivityLog {
+  id: string
+  action: string
+  type: string
+  timestamp: string
+  user: string
+}
+
+interface AuditLog {
+  id: string
+  created_at: string
+  action_type: string
+  action: string
+}
+
 // UI Components
-const Card = ({ children, className = "" }) => (
+const Card = ({ children, className = "" }: CardProps) => (
   <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
 )
-const CardHeader = ({ children, className = "" }) => (
+const CardHeader = ({ children, className = "" }: CardProps) => (
   <div className={`p-6 border-b ${className}`}>{children}</div>
 )
-const CardTitle = ({ children, className = "" }) => (
+const CardTitle = ({ children, className = "" }: CardProps) => (
   <h3 className={`text-xl font-bold ${className}`}>{children}</h3>
 )
-const CardContent = ({ children, className = "" }) => (
+const CardContent = ({ children, className = "" }: CardProps) => (
   <div className={`p-6 ${className}`}>{children}</div>
 )
-const Badge = ({ children, className = "" }) => (
+const Badge = ({ children, className = "" }: CardProps) => (
   <span className={`px-2 py-1 text-xs font-semibold rounded ${className}`}>{children}</span>
 )
-const Button = ({ children, onClick, variant = "default", size = "default", className = "" }) => {
+const Button = ({ children, onClick, variant = "default", size = "default", className = "" }: ButtonProps) => {
   const baseClasses = "px-4 py-2 rounded font-medium transition-colors"
   const variantClasses = variant === "outline" 
     ? "border border-gray-300 hover:bg-gray-50" 
@@ -47,7 +88,7 @@ const Button = ({ children, onClick, variant = "default", size = "default", clas
   )
 }
 
-export default function AdministratorDashboard({ userName }) {
+export default function AdministratorDashboard({ userName }: AdministratorDashboardProps) {
   const supabase = createClient()
   
   const [stats, setStats] = useState({
@@ -60,14 +101,17 @@ export default function AdministratorDashboard({ userName }) {
     apiCalls: 0
   })
   
-  const [institutionStats, setInstitutionStats] = useState([])
-  const [recentActivity, setRecentActivity] = useState([])
-  const [systemLogs, setSystemLogs] = useState([])
+  const [institutionStats, setInstitutionStats] = useState<InstitutionStat[]>([])
+  const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([])
+  const [systemLogs, setSystemLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("overview")
+  const [activeTab, setActiveTab] = useState<"overview" | "institutions" | "activity" | "system">("overview")
+
+  if (!supabase) return null
 
   useEffect(() => {
     fetchDashboardData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchDashboardData = async () => {
@@ -105,7 +149,7 @@ export default function AdministratorDashboard({ userName }) {
 
       // Calculate per-institution stats
       const institutions = ['Boys Town', 'Stony Hill', 'Leap']
-      const instStats = institutions.map(inst => {
+      const instStats: InstitutionStat[] = institutions.map(inst => {
         const instUsers = users?.filter(u => u.institution === inst) || []
         const instSubs = submissions?.filter(s => s.institution === inst) || []
         return {
@@ -119,15 +163,15 @@ export default function AdministratorDashboard({ userName }) {
       setInstitutionStats(instStats)
 
       // Recent activity
-      const activity = auditLogs?.slice(0, 10).map(log => ({
+      const activity: ActivityLog[] = (auditLogs?.slice(0, 10) || []).map(log => ({
         id: log.id,
         action: log.action,
         type: log.action_type,
         timestamp: log.created_at,
         user: log.user_id
-      })) || []
+      }))
       setRecentActivity(activity)
-      setSystemLogs(auditLogs?.slice(0, 20) || [])
+      setSystemLogs(auditLogs || [])
 
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error)
@@ -493,7 +537,7 @@ export default function AdministratorDashboard({ userName }) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <Button className="w-full justify-start" onClick={() => window.location.href = '/dashboard/users'}>
+                  <Button className="w-full justify-start" onClick={() => window.location.href = '/dashboard/admin/users'}>
                     <Users className="w-4 h-4 mr-3" />
                     Manage Users
                   </Button>

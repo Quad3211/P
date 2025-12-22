@@ -1,4 +1,6 @@
 // app/api/users/remove/route.ts
+// FIXED VERSION - Includes administrator role
+
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
@@ -14,16 +16,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if user is Head of Programs or Institution Manager
+    // Check if user is Administrator or Institution Manager
     const { data: profile } = await supabase
       .from("profiles")
       .select("role, institution")
       .eq("id", user.id)
       .single()
 
-    if (!profile || !['head_of_programs', 'institution_manager'].includes(profile.role)) {
+    // ✅ FIXED: Include administrator role
+    if (!profile || !['administrator', 'institution_manager'].includes(profile.role)) {
       return NextResponse.json(
-        { error: "Only Head of Programs and Institution Managers can remove users" },
+        { error: "Only Administrator and Institution Managers can remove users" },
         { status: 403 }
       )
     }
@@ -58,10 +61,10 @@ export async function POST(request: NextRequest) {
         )
       }
       
-      // Institution Manager cannot remove Head of Programs
-      if (targetUser.role === "head_of_programs") {
+      // Institution Manager cannot remove Administrator
+      if (targetUser.role === "administrator") {
         return NextResponse.json(
-          { error: "Institution Managers cannot remove Head of Programs accounts" },
+          { error: "Institution Managers cannot remove Administrator accounts" },
           { status: 403 }
         )
       }
